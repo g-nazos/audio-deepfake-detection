@@ -7,7 +7,7 @@ import tqdm
 # function to use ffmpeg in python and get the detected silence.
 def detect_silence(path, time):
     """
-    This function is a python wrapper to run the ffmpeg command in python and extranct the desired outputaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    This function is a python wrapper to run the ffmpeg command in python and extranct the desired output
     Hard coded the threshold to -23dB.
     time = silence time threshold
     returns = list of tuples with start and end point of silences
