@@ -1,11 +1,35 @@
-import subprocess
-from scipy.io.wavfile import read, write
-import numpy as np
+import os
 import tqdm
+import subprocess
+import numpy as np
+from scipy.io.wavfile import read, write
+
+
+def get_file_path(path):
+    """
+    This function gets the system path of the input audio file path.
+    Input:
+    path = Input audio file path (relative to the current working directory)
+    returns:
+    System path of the input audio file path if it exists, otherwise None
+    """
+    try:
+        cwd = os.getcwd()
+    except Exception as e:
+        print(f"Error getting current working directory: {e}")
+        return None
+    file_path = os.path.join(cwd, path)
+    if not os.path.exists(file_path):
+        print(f"File {file_path} does not exist")
+        return None
+    return file_path
 
 
 # function to use ffmpeg in python and get the detected silence.
 def detect_silence(path, time):
+    file_path = get_file_path(path)
+    if file_path is None:
+        return None
     """
     This function is a python wrapper to run the ffmpeg command in python and extranct the desired output
     Hard coded the threshold to -23dB.
@@ -13,7 +37,11 @@ def detect_silence(path, time):
     returns = list of tuples with start and end point of silences
     """
     command = (
-        "ffmpeg -i " + path + " -af silencedetect=n=-23dB:d=" + str(time) + " -f null -"
+        "ffmpeg -i "
+        + file_path
+        + " -af silencedetect=n=-23dB:d="
+        + str(time)
+        + " -f null -"
     )
     out = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, stderr = out.communicate()
@@ -52,7 +80,8 @@ def remove_silence(file, sil, keep_sil, out_path):
     returns:
     Non - silent patches and save the new audio in out path
     """
-    rate, aud = read(path)
+    file_path = get_file_path(file)
+    rate, aud = read(file_path)
     a = float(keep_sil) / 2
     sil_updated = [(i[0] + a, i[1] - a) for i in sil]
 
@@ -69,7 +98,7 @@ def remove_silence(file, sil, keep_sil, out_path):
         del non_sil[0]
 
     # cut the audio
-    print("slicing starte")
+    print("slicing started")
     ans = []
     ad = list(aud)
     for i in tqdm.tqdm(non_sil):
