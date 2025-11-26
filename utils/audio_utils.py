@@ -1,6 +1,8 @@
+import os
 import tqdm
 import subprocess
 import numpy as np
+import librosa
 from utils.utils import get_file_path
 from scipy.io.wavfile import read, write
 
@@ -86,3 +88,24 @@ def remove_silence(file, sil, keep_sil, out_path):
     # nm=path.split('/')[-1]
     write(out_path, rate, np.array(ans))
     return non_sil
+
+
+def get_wav_duration(filepath):
+    """
+    This is a helper function that checks if a given file
+    exists and is a .wav and if so returns the file duration.
+
+    Input:
+    filepath = audio file path
+
+    Returns:
+    float - audio length duration (in seconds) of the input time series or spectrogram.
+
+    Raises:
+    FileNotFoundError
+    """
+    if os.path.exists(filepath):
+        duration = librosa.get_duration(path=filepath)
+        return duration
+    else:
+        raise FileNotFoundError(f"File: {filepath} is not found!")

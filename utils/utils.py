@@ -1,7 +1,7 @@
 import os
 
 
-def get_file_path(path):
+def get_file_path(file, dataset_pathing, label):
     """
     This function gets the system path of the input audio file path.
     Input:
@@ -14,8 +14,14 @@ def get_file_path(path):
     except Exception as e:
         print(f"Error getting current working directory: {e}")
         return None
-    file_path = os.path.join(cwd, path)
+    if label == "spoof":
+        type = "fake"
+        file_path = os.path.join(cwd, dataset_pathing, type, file)
+    elif label == "bona-fide":
+        type = "real"
+        file_path = os.path.join(cwd, dataset_pathing, type, file)
+    else:
+        raise FileNotFoundError(f"Label given doesn't match!")
     if not os.path.exists(file_path):
-        print(f"File {file_path} does not exist")
-        return None
+        raise FileNotFoundError(f"File {file_path} does not exist")
     return file_path
