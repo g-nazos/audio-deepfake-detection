@@ -1,5 +1,6 @@
 .venv/
 in-the-wild-audio-deepfake/
+for-dataset/
 pycache/
 *.pyc
 *.pyo
@@ -11,3 +12,4 @@ pycache/
 *.pyzwz
 *.pyzwzw
 metadata/
+.env
