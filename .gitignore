@@ -13,3 +13,4 @@ pycache/
 *.pyzwzw
 metadata/
 .env
+PROMPTS.md
