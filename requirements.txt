@@ -1,3 +1,6 @@
+# System dependencies (install via apt):
+#   sudo apt install sox libsox-fmt-mp3 ffmpeg
+#
 asttokens==3.0.1
 audioop-lts==0.2.2
 audioread==3.1.0
