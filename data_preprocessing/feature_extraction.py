@@ -230,6 +230,12 @@ if __name__ == "__main__":
         sample_rate=22050,
         num_workers=4,
     )
+    output_path = (
+        r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\testing_features.csv"
+    )
+    df.to_csv(
+        output_path, index=False
+    )  # index=False avoids adding a separate index column
 
     print(df.head())
     print(df.shape)
