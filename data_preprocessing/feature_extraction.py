@@ -225,15 +225,13 @@ if __name__ == "__main__":
     }
 
     df = extract_features_from_folder(
-        r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\testing",
+        r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\training",
         feature_config,
         sample_rate=22050,
         num_workers=4,
     )
-    output_path = (
-        r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\testing_features.csv"
-    )
-    df.to_csv(
+    output_path = r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\training_features.parquet"
+    df.to_parquet(
         output_path, index=False
     )  # index=False avoids adding a separate index column
 
