@@ -1,4 +1,27 @@
 import os
+import json
+import joblib
+import platform
+from datetime import datetime
+import pandas as pd
+import numpy as np
+
+from sklearn.svm import LinearSVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+)
+
+
+import pandas as pd
+from sklearn.svm import LinearSVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
 def get_file_path(file, dataset_pathing, label):
@@ -23,3 +46,153 @@ def get_file_path(file, dataset_pathing, label):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File {file_path} does not exist")
     return file_path
+
+
+def train_and_evaluate_linear_svm(
+    train_path: str,
+    test_path: str,
+    svc_params: dict | None = None,
+):
+    """
+    Train a Linear SVM on extracted audio features and evaluate on a test set.
+
+    Returns everything needed to save an experiment:
+    - trained pipeline
+    - evaluation metrics
+    - model parameters
+    - feature names
+    - extra metadata (train/test size)
+    """
+
+    if svc_params is None:
+        svc_params = {
+            "C": 1.0,
+            "class_weight": "balanced",
+            "max_iter": 20000,
+            "random_state": 42,
+        }
+
+    train_df = pd.read_parquet(train_path)
+    train_df.dropna(inplace=True)
+    test_df = pd.read_parquet(test_path)
+    test_df.dropna(inplace=True)
+
+    # Split features and labels
+    def split_xy(df):
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values
+        return X.values, y, X.columns.tolist()
+
+    X_train, y_train, feature_names = split_xy(train_df)
+    X_test, y_test, _ = split_xy(test_df)
+
+    # Build pipeline
+    pipeline = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("svm", LinearSVC(**svc_params)),
+        ]
+    )
+
+    # Train
+    pipeline.fit(X_train, y_train)
+
+    # Predict
+    y_pred = pipeline.predict(X_test)
+
+    # Compute metrics
+    metrics = {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred)),
+        "recall": float(recall_score(y_test, y_pred)),
+        "f1": float(f1_score(y_test, y_pred)),
+    }
+
+    # Extra metadata for saving
+    metadata_extra = {
+        "train_samples": X_train.shape[0],
+        "test_samples": X_test.shape[0],
+    }
+
+    return pipeline, metrics, svc_params, feature_names, metadata_extra
+
+
+def save_experiment(
+    model,
+    metrics: dict,
+    experiment_dir: str = "experiments",
+    experiment_name: str | None = None,
+    model_params: dict | None = None,
+    feature_names: list | None = None,
+    metadata_extra: dict | None = None,
+):
+    """
+    Save a trained model, evaluation metrics, model parameters, and metadata
+    to a structured experiment folder.
+
+    Parameters
+    ----------
+    model : any
+        Trained model object (e.g., sklearn pipeline, XGBoost model).
+
+    metrics : dict
+        Dictionary containing evaluation metrics.
+
+    experiment_dir : str
+        Root directory to store experiments.
+
+    experiment_name : str, optional
+        Name of the experiment folder. Auto-generated if None.
+
+    model_params : dict, optional
+        Dictionary of model hyperparameters.
+
+    feature_names : list of str, optional
+        List of feature names used in training.
+
+    metadata_extra : dict, optional
+        Additional metadata to save (dataset info, notes, etc.).
+
+    Returns
+    -------
+    exp_path : str
+        Path to the saved experiment folder.
+    """
+    # Create experiment folder
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    if experiment_name is None:
+        experiment_name = f"exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    exp_path = os.path.join(experiment_dir, experiment_name)
+    os.makedirs(exp_path, exist_ok=True)
+
+    # Save model
+    joblib.dump(model, os.path.join(exp_path, "model.joblib"))
+
+    # Save metrics
+    with open(os.path.join(exp_path, "metrics.json"), "w") as f:
+        json.dump(metrics, f, indent=4)
+
+    # Save model parameters
+    if model_params is not None:
+        with open(os.path.join(exp_path, "model_params.json"), "w") as f:
+            json.dump(model_params, f, indent=4)
+
+    # Save metadata
+    metadata = {
+        "timestamp": datetime.now().isoformat(),
+        "num_features": len(feature_names) if feature_names is not None else None,
+        "feature_names": feature_names,
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+    }
+
+    if metadata_extra:
+        metadata.update(metadata_extra)
+
+    with open(os.path.join(exp_path, "metadata.json"), "w") as f:
+        json.dump(metadata, f, indent=4)
+
+    print(f"Experiment saved to: {exp_path}")
+    return exp_path
