@@ -1,10 +1,27 @@
+import logging
 import os
+import sys
 import librosa
 import numpy as np
 import pandas as pd
-from typing import Dict, Callable, Any
 from concurrent.futures import ProcessPoolExecutor
+from typing import Dict, Any
+
 from tqdm import tqdm
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+logger = logging.getLogger(__name__)
+
+try:
+    from configs.config_local import DATASET_PATH
+except ImportError:
+    DATASET_PATH = None
+    logger.warning(
+        "config_local.py not found; DATASET_PATH is unset. Using Current Working Directory."
+    )
 
 
 def mfcc(y, sr, n_mfcc=40, n_fft=2048, hop_length=512):
@@ -35,6 +52,10 @@ def pitch_yin(y, sr, fmin=50, fmax=300):
     return pitch[np.newaxis, :]  # shape (1, time)
 
 
+def mel_spectrogram(y, sr, **params):
+    return librosa.feature.melspectrogram(y=y, sr=sr, **params)
+
+
 FEATURE_FUNCTIONS = {
     # Energy / time
     "rmse": lambda y, sr, **p: librosa.feature.rms(y=y, **p),
@@ -56,6 +77,8 @@ FEATURE_FUNCTIONS = {
     "mfcc_delta2": mfcc_delta2,
     # Pitch dynamics
     "pitch_yin": pitch_yin,
+    # Mel spectrogram
+    "mel_spectrogram": mel_spectrogram,
 }
 
 
@@ -115,7 +138,7 @@ def _process_single_file(args):
         # Handle other features
         # -----------------------------
         for feat_name, params in feature_config.items():
-            if feat_name in ["mfcc", "mfcc_delta", "mfcc_delta2"]:
+            if feat_name in ["mfcc", "mfcc_delta", "mfcc_delta2", "mel_spectrogram"]:
                 continue
             matrix = FEATURE_FUNCTIONS[feat_name](y, sr, **params)
             agg = aggregate_feature(matrix)
@@ -222,15 +245,26 @@ if __name__ == "__main__":
         "mfcc_delta2": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
         # Pitch
         "pitch_yin": {"fmin": 50, "fmax": 300},
+        # Mel spectrogram
+        "mel_spectrogram": {"n_mels": 128},
     }
 
+    if DATASET_PATH is not None:
+        base_path = DATASET_PATH
+    else:
+        base_path = os.path.join(os.getcwd(), "FoR_dataset", "for-norm", "for-norm")
+
+    folder_path = os.path.join(base_path, "testing")
     df = extract_features_from_folder(
-        r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\training",
-        feature_config,
-        sample_rate=22050,
-        num_workers=4,
+        folder_path=folder_path,
+        feature_config=feature_config,
+        sample_rate=16000,
+        num_workers=12,
     )
-    output_path = r"c:\Users\konst\Documents\FoR_dataset\for-norm\for-norm\training_features.parquet"
+    output_path = os.path.join(
+        os.getcwd(), "FoR_dataset", "for-norm", "for-norm", "testing_features.parquet"
+    )
+    print(f"Saving features to {output_path}")
     df.to_parquet(
         output_path, index=False
     )  # index=False avoids adding a separate index column
