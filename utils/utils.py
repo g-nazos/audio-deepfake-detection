@@ -14,6 +14,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     f1_score,
+    roc_auc_score,
 )
 
 
@@ -106,6 +107,7 @@ def train_and_evaluate_linear_svm(
         "precision": float(precision_score(y_test, y_pred)),
         "recall": float(recall_score(y_test, y_pred)),
         "f1": float(f1_score(y_test, y_pred)),
+        "roc_auc": float(roc_auc_score(y_test, y_pred)),
     }
 
     # Extra metadata for saving
