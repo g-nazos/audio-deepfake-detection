@@ -15,13 +15,16 @@ if PROJECT_ROOT not in sys.path:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_DATASET_PATH = os.path.join(PROJECT_ROOT, "FoR_dataset", "for-norm", "for-norm")
+
 try:
     from configs.config_local import DATASET_PATH
 except ImportError:
     DATASET_PATH = None
-    logger.warning(
-        "config_local.py not found; DATASET_PATH is unset. Using Current Working Directory."
-    )
+
+if DATASET_PATH is None:
+    DATASET_PATH = DEFAULT_DATASET_PATH
+    logger.info("Using default dataset path: %s", DATASET_PATH)
 
 
 def mfcc(y, sr, n_mfcc=40, n_fft=2048, hop_length=512):
@@ -138,7 +141,7 @@ def _process_single_file(args):
         # Handle other features
         # -----------------------------
         for feat_name, params in feature_config.items():
-            if feat_name in ["mfcc", "mfcc_delta", "mfcc_delta2", "mel_spectrogram"]:
+            if feat_name in ["mfcc", "mfcc_delta", "mfcc_delta2"]:
                 continue
             matrix = FEATURE_FUNCTIONS[feat_name](y, sr, **params)
             agg = aggregate_feature(matrix)
@@ -230,6 +233,9 @@ if __name__ == "__main__":
     N_MFCC = 40
     N_FTT = 2048
     HOP_LENGTH = 512
+    # N_MFCC = 20
+    # N_FTT = 128
+    # HOP_LENGTH = 256
     feature_config = {
         # Energy / time
         "rmse": {},
@@ -249,20 +255,19 @@ if __name__ == "__main__":
         "mel_spectrogram": {"n_mels": 128},
     }
 
-    if DATASET_PATH is not None:
-        base_path = DATASET_PATH
-    else:
-        base_path = os.path.join(os.getcwd(), "FoR_dataset", "for-norm", "for-norm")
-
-    folder_path = os.path.join(base_path, "testing")
+    base_path = DATASET_PATH
+    folder_path = os.path.join(base_path, "validation")
     df = extract_features_from_folder(
         folder_path=folder_path,
         feature_config=feature_config,
         sample_rate=16000,
-        num_workers=12,
+        num_workers=None,
     )
     output_path = os.path.join(
-        os.getcwd(), "FoR_dataset", "for-norm", "for-norm", "testing_features.parquet"
+        PROJECT_ROOT,
+        "FoR_dataset",
+        "features",
+        f"validation_features_{N_MFCC}_{N_FTT}_{HOP_LENGTH}.parquet",
     )
     print(f"Saving features to {output_path}")
     df.to_parquet(
