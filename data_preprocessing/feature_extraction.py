@@ -233,9 +233,11 @@ if __name__ == "__main__":
     N_MFCC = 40
     N_FTT = 2048
     HOP_LENGTH = 512
+    N_MELS = 128
     # N_MFCC = 20
     # N_FTT = 128
     # HOP_LENGTH = 256
+    # N_MELS = 128
     feature_config = {
         # Energy / time
         "rmse": {},
@@ -252,22 +254,26 @@ if __name__ == "__main__":
         # Pitch
         "pitch_yin": {"fmin": 50, "fmax": 300},
         # Mel spectrogram
-        "mel_spectrogram": {"n_mels": 128},
+        "mel_spectrogram": {"n_mels": N_MELS},
     }
 
     base_path = DATASET_PATH
-    folder_path = os.path.join(base_path, "validation")
+    split = "validation"
+    folder_path = os.path.join(base_path, split)
     df = extract_features_from_folder(
         folder_path=folder_path,
         feature_config=feature_config,
         sample_rate=16000,
         num_workers=None,
     )
+    filename_parts = [f"{split}_features_{N_MFCC}_{N_FTT}_{HOP_LENGTH}"]
+    if "mel_spectrogram" in feature_config:
+        filename_parts.append(str(N_MELS))
     output_path = os.path.join(
         PROJECT_ROOT,
         "FoR_dataset",
         "features",
-        f"validation_features_{N_MFCC}_{N_FTT}_{HOP_LENGTH}.parquet",
+        "_".join(filename_parts) + ".parquet",
     )
     print(f"Saving features to {output_path}")
     df.to_parquet(
