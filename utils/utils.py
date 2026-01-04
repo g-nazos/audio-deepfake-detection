@@ -18,13 +18,6 @@ from sklearn.metrics import (
 )
 
 
-import pandas as pd
-from sklearn.svm import LinearSVC
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
-
 def get_file_path(file, dataset_pathing, label):
     """
     This function gets the system path of the input audio file path.
@@ -106,7 +99,7 @@ def train_and_evaluate_linear_svm(
         "accuracy": float(accuracy_score(y_test, y_pred)),
         "precision": float(precision_score(y_test, y_pred)),
         "recall": float(recall_score(y_test, y_pred)),
-        "f1": float(f1_score(y_test, y_pred)),
+        "f1": float(f1_score(y_test, y_pred, average="macro")),
         "roc_auc": float(roc_auc_score(y_test, y_pred)),
     }
 
