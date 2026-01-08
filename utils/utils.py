@@ -112,6 +112,95 @@ def train_and_evaluate_linear_svm(
     return pipeline, metrics, svc_params, feature_names, metadata_extra
 
 
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+)
+import pandas as pd
+
+
+def train_and_evaluate_logistic_regression(
+    train_path: str,
+    test_path: str,
+    lr_params: dict | None = None,
+):
+    """
+    Train a Logistic Regression model on extracted audio features and evaluate on a test set.
+
+    Returns everything needed to save an experiment:
+    - trained pipeline
+    - evaluation metrics
+    - model parameters
+    - feature names
+    - extra metadata (train/test size)
+    """
+
+    if lr_params is None:
+        lr_params = {
+            "C": 1.0,  # Regularization strength
+            "class_weight": "balanced",  # Handle imbalanced classes
+            "max_iter": 1000,  # Usually enough to converge
+            "random_state": 42,
+            "solver": "liblinear",  # Good for small-medium datasets, handles binary classification well
+            "penalty": "l2",  # Standard L2 regularization
+        }
+
+    # Load datasets
+    train_df = pd.read_parquet(train_path)
+    train_df.dropna(inplace=True)
+    test_df = pd.read_parquet(test_path)
+    test_df.dropna(inplace=True)
+
+    # Split features and labels
+    def split_xy(df):
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values
+        return X.values, y, X.columns.tolist()
+
+    X_train, y_train, feature_names = split_xy(train_df)
+    X_test, y_test, _ = split_xy(test_df)
+
+    # Build pipeline
+    pipeline = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("lr", LogisticRegression(**lr_params)),
+        ]
+    )
+
+    # Train
+    pipeline.fit(X_train, y_train)
+
+    # Predict
+    y_pred = pipeline.predict(X_test)
+    y_proba = pipeline.predict_proba(X_test)[:, 1]  # For ROC AUC
+
+    # Compute metrics
+    metrics = {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred)),
+        "recall": float(recall_score(y_test, y_pred)),
+        "f1": float(f1_score(y_test, y_pred, average="macro")),
+        "roc_auc": float(
+            roc_auc_score(y_test, y_proba)
+        ),  # Use probabilities for ROC AUC
+    }
+
+    # Extra metadata for saving
+    metadata_extra = {
+        "train_samples": X_train.shape[0],
+        "test_samples": X_test.shape[0],
+    }
+
+    return pipeline, metrics, lr_params, feature_names, metadata_extra
+
+
 def save_experiment(
     model,
     metrics: dict,
