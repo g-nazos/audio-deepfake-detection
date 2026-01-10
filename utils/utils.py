@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
@@ -110,19 +111,6 @@ def train_and_evaluate_linear_svm(
     }
 
     return pipeline, metrics, svc_params, feature_names, metadata_extra
-
-
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    roc_auc_score,
-)
-import pandas as pd
 
 
 def train_and_evaluate_logistic_regression(
@@ -280,3 +268,47 @@ def save_experiment(
 
     print(f"Experiment saved to: {exp_path}")
     return exp_path
+
+
+def evaluate_model_on_parquet(
+    model,
+    test_path: str,
+):
+    """
+    Evaluate a trained model/pipeline on a parquet test dataset.
+
+    Returns:
+    - evaluation metrics
+    - extra metadata (test size)
+    """
+
+    # Load test dataset
+    test_df = pd.read_parquet(test_path)
+    test_df.dropna(inplace=True)
+
+    # Split features and labels
+    X_test = test_df.drop(columns=["label", "filename"], errors="ignore").values
+    y_test = test_df["label"].map({"real": 0, "fake": 1}).values
+
+    # Predict
+    y_pred = model.predict(X_test)
+
+    # Some models may not support predict_proba
+    y_proba = None
+    if hasattr(model, "predict_proba"):
+        y_proba = model.predict_proba(X_test)[:, 1]
+
+    # Compute metrics
+    metrics = {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred)),
+        "recall": float(recall_score(y_test, y_pred)),
+        "f1": float(f1_score(y_test, y_pred, average="macro")),
+    }
+
+    if y_proba is not None:
+        metrics["roc_auc"] = float(roc_auc_score(y_test, y_proba))
+
+    metadata_extra = {"test_samples": X_test.shape[0], "test_file": test_path}
+
+    return metrics, metadata_extra
