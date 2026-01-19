@@ -5,7 +5,7 @@ import librosa
 import numpy as np
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from tqdm import tqdm
 
@@ -165,7 +165,7 @@ def extract_features_from_folder(
     folder_path: str,
     feature_config: Dict[str, Dict[str, Any]],
     sample_rate: int = 16000,
-    num_workers: int = None,
+    num_workers: Optional[int] = None,
 ) -> pd.DataFrame:
     """
     Extract features from audio files in 'real' and 'fake' subfolders using multiprocessing.
@@ -214,7 +214,10 @@ def extract_features_from_folder(
     # Run multiprocessing with progress bar
     if num_workers is None:
         cpu_count = os.cpu_count()
-        num_workers = max(1, cpu_count - 1)
+        if cpu_count is not None:
+            num_workers = cpu_count - 1 if cpu_count > 1 else 1
+        else:
+            num_workers = 1
 
     print(f"Using {num_workers} workers...")
     results = []
@@ -258,7 +261,7 @@ if __name__ == "__main__":
     }
 
     base_path = DATASET_PATH
-    split = "validation"
+    split = "testing"
     folder_path = os.path.join(base_path, split)
     df = extract_features_from_folder(
         folder_path=folder_path,
