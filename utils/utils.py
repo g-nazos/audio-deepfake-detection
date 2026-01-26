@@ -400,3 +400,56 @@ def find_best_trained_monel(folder_path, metric):
             best_model = exp
     print(f"Best model according to {metric}: {best_model}, {metric}={metric_value}")
     return best_model
+
+
+def find_best_trained_monel(folder_path, metric):
+    best_model = None
+    metric_value = 0
+    for exp in os.listdir(folder_path):
+        experiment_name = exp
+        with open(os.path.join(folder_path, exp, "metrics.json"), "r") as f:
+            metrics = json.load(f)
+        new_metric_value = metrics[metric]
+        if new_metric_value > metric_value:
+            metric_value = new_metric_value
+            best_model = exp
+    print(f"Best model according to {metric}: {best_model}, {metric}={metric_value}")
+    return best_model
+
+
+def find_highly_correlated_features(corr_matrix, threshold=0.85):
+    """
+    Find pairs of features with correlation above the threshold.
+
+    Args:
+        corr_matrix: Correlation matrix DataFrame
+        threshold: Correlation threshold
+
+    Returns:
+        DataFrame with feature pairs and their correlation values
+    """
+    # Create a copy and set diagonal to NaN to exclude self-correlations
+    corr_matrix_copy = corr_matrix.copy()
+    mask = np.tril(np.ones(corr_matrix_copy.shape), k=-1).astype(bool)
+    corr_matrix_lower = corr_matrix_copy.mask(mask)
+
+    corr_matrix_selected = corr_matrix_lower
+    # Find pairs above threshold (both positive and negative)
+    high_corr_pairs = []
+    for i in range(len(corr_matrix_selected.columns)):
+        for j in range(i + 1, len(corr_matrix_selected.columns)):
+            corr_value = corr_matrix_selected.iloc[i, j]
+            if not np.isnan(corr_value) and abs(corr_value) >= threshold:
+                high_corr_pairs.append(
+                    {
+                        "feature_1": corr_matrix_selected.columns[i],
+                        "feature_2": corr_matrix_selected.columns[j],
+                        "correlation": corr_value,
+                    }
+                )
+
+    result_df = pd.DataFrame(high_corr_pairs)
+    if len(result_df) > 0:
+        result_df = result_df.sort_values("correlation", key=abs, ascending=False)
+
+    return result_df
