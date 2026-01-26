@@ -402,21 +402,6 @@ def find_best_trained_monel(folder_path, metric):
     return best_model
 
 
-def find_best_trained_monel(folder_path, metric):
-    best_model = None
-    metric_value = 0
-    for exp in os.listdir(folder_path):
-        experiment_name = exp
-        with open(os.path.join(folder_path, exp, "metrics.json"), "r") as f:
-            metrics = json.load(f)
-        new_metric_value = metrics[metric]
-        if new_metric_value > metric_value:
-            metric_value = new_metric_value
-            best_model = exp
-    print(f"Best model according to {metric}: {best_model}, {metric}={metric_value}")
-    return best_model
-
-
 def find_highly_correlated_features(corr_matrix, threshold=0.85):
     """
     Find pairs of features with correlation above the threshold.
