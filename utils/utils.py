@@ -8,6 +8,7 @@ import numpy as np
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import (
@@ -94,14 +95,86 @@ def train_and_evaluate_linear_svm(
 
     # Predict
     y_pred = pipeline.predict(X_test)
+    y_scores = pipeline.decision_function(X_test)
+    # Compute metrics
+    metrics = {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_pred, average="macro")),
+        "f1": float(f1_score(y_test, y_pred, average="macro")),
+        "roc_auc": float(roc_auc_score(y_test, y_scores)),
+    }
+
+    # Extra metadata for saving
+    metadata_extra = {
+        "train_samples": X_train.shape[0],
+        "test_samples": X_test.shape[0],
+    }
+
+    return pipeline, metrics, svc_params, feature_names, metadata_extra
+
+
+def train_and_evaluate_non_linear_svm(
+    train_path: str,
+    test_path: str,
+    svc_params: dict | None = None,
+):
+    """
+    Train a Linear SVM on extracted audio features and evaluate on a test set.
+
+    Returns everything needed to save an experiment:
+    - trained pipeline
+    - evaluation metrics
+    - model parameters
+    - feature names
+    - extra metadata (train/test size)
+    """
+
+    if svc_params is None:
+        svc_params = {
+            "kernel": "rbf",
+            "C": 1.0,
+            "class_weight": "balanced",
+            "max_iter": 20000,
+            "random_state": 42,
+        }
+
+    train_df = pd.read_parquet(train_path)
+    train_df.dropna(inplace=True)
+    test_df = pd.read_parquet(test_path)
+    test_df.dropna(inplace=True)
+
+    # Split features and labels
+    def split_xy(df):
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values
+        return X.values, y, X.columns.tolist()
+
+    X_train, y_train, feature_names = split_xy(train_df)
+    X_test, y_test, _ = split_xy(test_df)
+
+    # Build pipeline
+    pipeline = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("svm", SVC(**svc_params)),
+        ]
+    )
+
+    # Train
+    pipeline.fit(X_train, y_train)
+
+    # Predict
+    y_pred = pipeline.predict(X_test)
+    y_scores = pipeline.decision_function(X_test)
 
     # Compute metrics
     metrics = {
         "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred)),
-        "recall": float(recall_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_pred, average="macro")),
         "f1": float(f1_score(y_test, y_pred, average="macro")),
-        "roc_auc": float(roc_auc_score(y_test, y_pred)),
+        "roc_auc": float(roc_auc_score(y_test, y_scores)),
     }
 
     # Extra metadata for saving
@@ -172,8 +245,8 @@ def train_and_evaluate_logistic_regression(
     # Compute metrics
     metrics = {
         "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred)),
-        "recall": float(recall_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_pred, average="macro")),
         "f1": float(f1_score(y_test, y_pred, average="macro")),
         "roc_auc": float(
             roc_auc_score(y_test, y_proba)
@@ -312,3 +385,18 @@ def evaluate_model_on_parquet(
     metadata_extra = {"test_samples": X_test.shape[0], "test_file": test_path}
 
     return metrics, metadata_extra
+
+
+def find_best_trained_monel(folder_path, metric):
+    best_model = None
+    metric_value = 0
+    for exp in os.listdir(folder_path):
+        experiment_name = exp
+        with open(os.path.join(folder_path, exp, "metrics.json"), "r") as f:
+            metrics = json.load(f)
+        new_metric_value = metrics[metric]
+        if new_metric_value > metric_value:
+            metric_value = new_metric_value
+            best_model = exp
+    print(f"Best model according to {metric}: {best_model}, {metric}={metric_value}")
+    return best_model
