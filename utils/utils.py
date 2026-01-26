@@ -19,6 +19,8 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from sklearn.model_selection import GridSearchCV
+
 
 def get_file_path(file, dataset_pathing, label):
     """
@@ -438,3 +440,75 @@ def find_highly_correlated_features(corr_matrix, threshold=0.85):
         result_df = result_df.sort_values("correlation", key=abs, ascending=False)
 
     return result_df
+
+
+def grid_search_model(
+    model,
+    param_grid: dict,
+    train_path: str,
+    test_path: str,
+    *,
+    scoring: str = "f1_macro",
+    cv: int = 5,
+    n_jobs: int = -1,
+    verbose: int = 2,
+):
+    # Load data
+    train_df = pd.read_parquet(train_path)
+    test_df = pd.read_parquet(test_path)
+
+    # Clean NaNs + infs
+    for df in (train_df, test_df):
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.dropna(inplace=True)
+
+    def split_xy(df):
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values
+        if np.isnan(y).any():
+            raise ValueError("Invalid label values detected")
+        return X.values, y, X.columns.tolist()
+
+    X_train, y_train, feature_names = split_xy(train_df)
+    X_test, y_test, _ = split_xy(test_df)
+
+    # Grid search
+    grid = GridSearchCV(
+        estimator=model,
+        param_grid=param_grid,
+        scoring=scoring,
+        cv=cv,
+        n_jobs=n_jobs,
+        verbose=verbose,
+    )
+
+    grid.fit(X_train, y_train)
+
+    best_model = grid.best_estimator_
+
+    # Predictions
+    y_pred = best_model.predict(X_test)
+
+    # Scores for ROC AUC
+    if hasattr(best_model, "decision_function"):
+        y_scores = best_model.decision_function(X_test)
+    elif hasattr(best_model, "predict_proba"):
+        y_scores = best_model.predict_proba(X_test)[:, 1]
+    else:
+        raise RuntimeError("Model does not support ROC AUC scoring")
+
+    metrics = {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_pred, average="macro")),
+        "f1": float(f1_score(y_test, y_pred, average="macro")),
+        "roc_auc": float(roc_auc_score(y_test, y_scores)),
+    }
+
+    metadata = {
+        "cv_best_score": float(grid.best_score_),
+        "train_samples": X_train.shape[0],
+        "test_samples": X_test.shape[0],
+    }
+
+    return best_model, metrics, grid.best_params_, metadata, feature_names
