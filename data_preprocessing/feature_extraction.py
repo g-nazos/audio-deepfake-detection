@@ -89,15 +89,11 @@ def aggregate_feature(matrix: np.ndarray) -> np.ndarray:
     """
     Aggregate time-varying features into fixed-length statistics.
     Assumes shape (n_features, time)
+    Returns only mean (std removed to reduce correlation).
     """
-    return np.concatenate(
-        [
-            np.mean(matrix, axis=1),
-            np.std(matrix, axis=1),
-            # np.min(matrix, axis=1),
-            # np.max(matrix, axis=1),
-        ]
-    )
+    return np.mean(matrix, axis=1)
+    # To include std: return np.concatenate([np.mean(matrix, axis=1), np.std(matrix, axis=1)])
+    # To include min/max: return np.concatenate([np.mean(matrix, axis=1), np.min(matrix, axis=1), np.max(matrix, axis=1)])
 
 
 def _process_single_file(args):
@@ -119,23 +115,24 @@ def _process_single_file(args):
         mfcc_params = feature_config["mfcc"]
         mfcc_matrix = mfcc(y, sr, **mfcc_params)
 
-        # Only compute delta if there is more than 1 frame
+        # Only compute features that are in the config
+        mfcc_features = {"mfcc": mfcc_matrix}
+        
+        # Only compute delta if requested in config and there is more than 1 frame
         if mfcc_matrix.shape[1] > 1:
-            mfcc_features = {
-                "mfcc": mfcc_matrix,
-                "mfcc_delta": librosa.feature.delta(mfcc_matrix, order=1),
-                "mfcc_delta2": librosa.feature.delta(mfcc_matrix, order=2),
-            }
-        else:
+            if "mfcc_delta" in feature_config:
+                mfcc_features["mfcc_delta"] = librosa.feature.delta(mfcc_matrix, order=1)
+            if "mfcc_delta2" in feature_config:
+                mfcc_features["mfcc_delta2"] = librosa.feature.delta(mfcc_matrix, order=2)
+        elif "mfcc_delta" in feature_config or "mfcc_delta2" in feature_config:
             print(f"Warning: {filename} has too few frames for delta computation.")
-            mfcc_features = {"mfcc": mfcc_matrix}
 
         for feat_name, matrix in mfcc_features.items():
             agg = aggregate_feature(matrix)
             n = matrix.shape[0]
             for i in range(n):
                 row_data[f"{feat_name}_mean_{i}"] = agg[i]
-                row_data[f"{feat_name}_std_{i}"] = agg[i + n]
+                # row_data[f"{feat_name}_std_{i}"] = agg[i + n]  # Commented out: std features removed to reduce correlation
 
         # -----------------------------
         # Handle other features
@@ -148,7 +145,7 @@ def _process_single_file(args):
             n = matrix.shape[0]
             for i in range(n):
                 row_data[f"{feat_name}_mean_{i}"] = agg[i]
-                row_data[f"{feat_name}_std_{i}"] = agg[i + n]
+                # row_data[f"{feat_name}_std_{i}"] = agg[i + n]  # Commented out: std features removed to reduce correlation
 
     except Exception as e:
         # Catch errors per file and log
@@ -156,7 +153,7 @@ def _process_single_file(args):
         # fill row_data with NaNs to keep DataFrame shape consistent
         for feat_name in feature_config.keys():
             row_data[f"{feat_name}_mean_0"] = np.nan
-            row_data[f"{feat_name}_std_0"] = np.nan
+            # row_data[f"{feat_name}_std_0"] = np.nan  # Commented out: std features removed to reduce correlation
 
     return row_data
 
@@ -241,25 +238,42 @@ if __name__ == "__main__":
     # N_FTT = 128
     # HOP_LENGTH = 256
     # N_MELS = 128
+    # feature_config = {
+    #     # Energy / time
+    #     "rmse": {},
+    #     "zero_crossing_rate": {},
+    #     # Spectral statistics
+    #     "spectral_centroid": {},
+    #     "spectral_bandwidth": {},
+    #     "spectral_flatness": {},
+    #     "spectral_rolloff": {},
+    #     # MFCC-based (core forensic features)
+    #     "mfcc": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
+    #     "mfcc_delta": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
+    #     "mfcc_delta2": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
+    #     # Pitch
+    #     "pitch_yin": {"fmin": 50, "fmax": 300},
+    #     # Mel spectrogram
+    #     "mel_spectrogram": {"n_mels": N_MELS},
+    # }
+    
     feature_config = {
         # Energy / time
         "rmse": {},
         "zero_crossing_rate": {},
-        # Spectral statistics
+        # Spectral statistics (removed spectral_rolloff - highly correlated with spectral_centroid)
         "spectral_centroid": {},
         "spectral_bandwidth": {},
         "spectral_flatness": {},
-        "spectral_rolloff": {},
         # MFCC-based (core forensic features)
+        # Note: mfcc_delta and mfcc_delta2 removed to reduce correlation
         "mfcc": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
-        "mfcc_delta": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
-        "mfcc_delta2": {"n_mfcc": N_MFCC, "n_fft": N_FTT, "hop_length": HOP_LENGTH},
         # Pitch
         "pitch_yin": {"fmin": 50, "fmax": 300},
         # Mel spectrogram
         "mel_spectrogram": {"n_mels": N_MELS},
     }
-
+    
     base_path = DATASET_PATH
     split = "testing"
     folder_path = os.path.join(base_path, split)
@@ -269,7 +283,7 @@ if __name__ == "__main__":
         sample_rate=16000,
         num_workers=None,
     )
-    filename_parts = [f"{split}_features_{N_MFCC}_{N_FTT}_{HOP_LENGTH}"]
+    filename_parts = [f"{split}_features_no_corr_{N_MFCC}_{N_FTT}_{HOP_LENGTH}"]
     if "mel_spectrogram" in feature_config:
         filename_parts.append(str(N_MELS))
     output_path = os.path.join(
