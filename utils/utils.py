@@ -19,7 +19,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, GroupKFold
 
 
 def get_file_path(file, dataset_pathing, label):
@@ -462,28 +462,34 @@ def grid_search_model(
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
 
-    def split_xy(df):
-        X = df.drop(columns=["label", "filename"], errors="ignore")
+    # Extract group_id from filename
+    for df in (train_df, test_df):
+        df["group_id"] = df["filename"].str.extract(r"(file\d+\.(?:wav|mp3))")[0]
+
+    # Split X, y, groups
+    def split_xy_groups(df):
+        X = df.drop(columns=["label", "filename", "group_id"], errors="ignore")
         y = df["label"].map({"real": 0, "fake": 1}).values
-        if np.isnan(y).any():
-            raise ValueError("Invalid label values detected")
-        return X.values, y, X.columns.tolist()
+        groups = df["group_id"].values
+        return X.values, y, groups, X.columns.tolist()
 
-    X_train, y_train, feature_names = split_xy(train_df)
-    X_test, y_test, _ = split_xy(test_df)
+    X_train, y_train, groups_train, feature_names = split_xy_groups(train_df)
+    X_test, y_test, groups_test, _ = split_xy_groups(test_df)
 
-    # Grid search
+    # GroupKFold
+    gkf = GroupKFold(n_splits=cv)
+
+    # Grid search with GroupKFold
     grid = GridSearchCV(
         estimator=model,
         param_grid=param_grid,
         scoring=scoring,
-        cv=cv,
+        cv=gkf.split(X_train, y_train, groups_train),
         n_jobs=n_jobs,
         verbose=verbose,
     )
 
     grid.fit(X_train, y_train)
-
     best_model = grid.best_estimator_
 
     # Predictions
@@ -509,6 +515,8 @@ def grid_search_model(
         "cv_best_score": float(grid.best_score_),
         "train_samples": X_train.shape[0],
         "test_samples": X_test.shape[0],
+        "train_groups": len(np.unique(groups_train)),
+        "test_groups": len(np.unique(groups_test)),
     }
 
     return best_model, metrics, grid.best_params_, metadata, feature_names
