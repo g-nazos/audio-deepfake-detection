@@ -5,6 +5,8 @@ import platform
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
@@ -17,6 +19,9 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    precision_recall_curve,
 )
 
 from sklearn.model_selection import GridSearchCV, GroupKFold
@@ -348,13 +353,14 @@ def save_experiment(
 def evaluate_model_on_parquet(
     model,
     test_path: str,
+    plots: bool = False,
 ):
     """
     Evaluate a trained model/pipeline on a parquet test dataset.
 
     Returns:
-    - evaluation metrics
-    - extra metadata (test size)
+    - metrics (dict)
+    - extra metadata (dict)
     """
 
     # Load test dataset
@@ -368,23 +374,62 @@ def evaluate_model_on_parquet(
     # Predict
     y_pred = model.predict(X_test)
 
-    # Some models may not support predict_proba
     y_proba = None
     if hasattr(model, "predict_proba"):
         y_proba = model.predict_proba(X_test)[:, 1]
 
-    # Compute metrics
+    # Metrics (explicitly fake=1)
     metrics = {
         "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred)),
-        "recall": float(recall_score(y_test, y_pred)),
-        "f1": float(f1_score(y_test, y_pred, average="macro")),
+        "precision": float(precision_score(y_test, y_pred, pos_label=1)),
+        "recall": float(recall_score(y_test, y_pred, pos_label=1)),
+        "f1_macro": float(f1_score(y_test, y_pred, average="macro")),
     }
 
     if y_proba is not None:
         metrics["roc_auc"] = float(roc_auc_score(y_test, y_proba))
 
-    metadata_extra = {"test_samples": X_test.shape[0], "test_file": test_path}
+    metadata_extra = {
+        "test_samples": int(X_test.shape[0]),
+        "test_file": test_path,
+    }
+
+    # -------------------------
+    # Optional visualizations
+    # -------------------------
+    if plots:
+        # Confusion Matrix (most important)
+        cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+        disp = ConfusionMatrixDisplay(
+            confusion_matrix=cm,
+            display_labels=["real (0)", "fake (1)"],
+        )
+        disp.plot()
+        plt.title("Confusion Matrix")
+        plt.show()
+
+        # Precision–Recall curve (recall tuning)
+        if y_proba is not None:
+            precision, recall, thresholds = precision_recall_curve(y_test, y_proba)
+
+            plt.figure()
+            plt.plot(recall, precision)
+            plt.xlabel("Recall (fake)")
+            plt.ylabel("Precision (fake)")
+            plt.title("Precision–Recall Curve")
+            plt.grid(True)
+            plt.show()
+
+        # Score distribution (debug false negatives)
+        if y_proba is not None:
+            plt.figure()
+            plt.hist(y_proba[y_test == 0], bins=50, alpha=0.6, label="real")
+            plt.hist(y_proba[y_test == 1], bins=50, alpha=0.6, label="fake")
+            plt.xlabel("P(fake)")
+            plt.ylabel("Count")
+            plt.title("Prediction Score Distribution")
+            plt.legend()
+            plt.show()
 
     return metrics, metadata_extra
 
