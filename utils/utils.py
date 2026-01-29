@@ -5,7 +5,7 @@ import platform
 from datetime import datetime
 import pandas as pd
 import numpy as np
-
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.svm import SVC
@@ -512,3 +512,30 @@ def grid_search_model(
     }
 
     return best_model, metrics, grid.best_params_, metadata, feature_names
+
+def train_and_evaluate_decision_tree(
+    train_path: str,
+    test_path: str,
+    dt_params: dict | None = None,
+    criterion: str = "gini",
+):
+    """
+    Train a Decision Tree Classifier on extracted audio features and evaluate on a test set.
+    """
+    if dt_params is None:
+        dt_params = {
+            "max_depth": 10,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
+            "max_features": "auto",
+            "random_state": 42,
+        }
+    
+    train_df = pd.read_parquet(train_path)
+    train_df.dropna(inplace=True)
+    test_df = pd.read_parquet(test_path)
+    test_df.dropna(inplace=True)
+    
+    if criterion == "gini":
+        clf = DecisionTreeClassifier(criterion="gini", **dt_params)
+        
