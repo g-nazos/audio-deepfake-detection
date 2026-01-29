@@ -5,6 +5,8 @@ import platform
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
@@ -17,9 +19,12 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    precision_recall_curve,
 )
 
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, GroupKFold
 
 
 def get_file_path(file, dataset_pathing, label):
@@ -348,13 +353,14 @@ def save_experiment(
 def evaluate_model_on_parquet(
     model,
     test_path: str,
+    plots: bool = False,
 ):
     """
     Evaluate a trained model/pipeline on a parquet test dataset.
 
     Returns:
-    - evaluation metrics
-    - extra metadata (test size)
+    - metrics (dict)
+    - extra metadata (dict)
     """
 
     # Load test dataset
@@ -368,23 +374,65 @@ def evaluate_model_on_parquet(
     # Predict
     y_pred = model.predict(X_test)
 
-    # Some models may not support predict_proba
     y_proba = None
     if hasattr(model, "predict_proba"):
         y_proba = model.predict_proba(X_test)[:, 1]
 
-    # Compute metrics
+    # Metrics (explicitly fake=1)
     metrics = {
         "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred)),
-        "recall": float(recall_score(y_test, y_pred)),
-        "f1": float(f1_score(y_test, y_pred, average="macro")),
+        "precision": float(precision_score(y_test, y_pred, pos_label=1)),
+        "recall": float(recall_score(y_test, y_pred, pos_label=1)),
+        "f1_macro": float(f1_score(y_test, y_pred, average="macro")),
     }
 
     if y_proba is not None:
         metrics["roc_auc"] = float(roc_auc_score(y_test, y_proba))
+    else:
+        y_scores = model.decision_function(X_test)
+        metrics["roc_auc"] = float(roc_auc_score(y_test, y_scores))
 
-    metadata_extra = {"test_samples": X_test.shape[0], "test_file": test_path}
+    metadata_extra = {
+        "test_samples": int(X_test.shape[0]),
+        "test_file": test_path,
+    }
+
+    # -------------------------
+    # Optional visualizations
+    # -------------------------
+    if plots:
+        # Confusion Matrix (most important)
+        cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+        disp = ConfusionMatrixDisplay(
+            confusion_matrix=cm,
+            display_labels=["real (0)", "fake (1)"],
+        )
+        disp.plot()
+        plt.title("Confusion Matrix")
+        plt.show()
+
+        # Precision–Recall curve (recall tuning)
+        if y_proba is not None:
+            precision, recall, thresholds = precision_recall_curve(y_test, y_proba)
+
+            plt.figure()
+            plt.plot(recall, precision)
+            plt.xlabel("Recall (fake)")
+            plt.ylabel("Precision (fake)")
+            plt.title("Precision–Recall Curve")
+            plt.grid(True)
+            plt.show()
+
+        # Score distribution (debug false negatives)
+        if y_proba is not None:
+            plt.figure()
+            plt.hist(y_proba[y_test == 0], bins=50, alpha=0.6, label="real")
+            plt.hist(y_proba[y_test == 1], bins=50, alpha=0.6, label="fake")
+            plt.xlabel("P(fake)")
+            plt.ylabel("Count")
+            plt.title("Prediction Score Distribution")
+            plt.legend()
+            plt.show()
 
     return metrics, metadata_extra
 
@@ -462,28 +510,34 @@ def grid_search_model(
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
 
-    def split_xy(df):
-        X = df.drop(columns=["label", "filename"], errors="ignore")
+    # Extract group_id from filename
+    for df in (train_df, test_df):
+        df["group_id"] = df["filename"].str.extract(r"(file\d+\.(?:wav|mp3))")[0]
+
+    # Split X, y, groups
+    def split_xy_groups(df):
+        X = df.drop(columns=["label", "filename", "group_id"], errors="ignore")
         y = df["label"].map({"real": 0, "fake": 1}).values
-        if np.isnan(y).any():
-            raise ValueError("Invalid label values detected")
-        return X.values, y, X.columns.tolist()
+        groups = df["group_id"].values
+        return X.values, y, groups, X.columns.tolist()
 
-    X_train, y_train, feature_names = split_xy(train_df)
-    X_test, y_test, _ = split_xy(test_df)
+    X_train, y_train, groups_train, feature_names = split_xy_groups(train_df)
+    X_test, y_test, groups_test, _ = split_xy_groups(test_df)
 
-    # Grid search
+    # GroupKFold
+    gkf = GroupKFold(n_splits=cv)
+
+    # Grid search with GroupKFold
     grid = GridSearchCV(
         estimator=model,
         param_grid=param_grid,
         scoring=scoring,
-        cv=cv,
+        cv=gkf.split(X_train, y_train, groups_train),
         n_jobs=n_jobs,
         verbose=verbose,
     )
 
     grid.fit(X_train, y_train)
-
     best_model = grid.best_estimator_
 
     # Predictions
@@ -509,6 +563,8 @@ def grid_search_model(
         "cv_best_score": float(grid.best_score_),
         "train_samples": X_train.shape[0],
         "test_samples": X_test.shape[0],
+        "train_groups": len(np.unique(groups_train)),
+        "test_groups": len(np.unique(groups_test)),
     }
 
     return best_model, metrics, grid.best_params_, metadata, feature_names
