@@ -388,6 +388,9 @@ def evaluate_model_on_parquet(
 
     if y_proba is not None:
         metrics["roc_auc"] = float(roc_auc_score(y_test, y_proba))
+    else:
+        y_scores = model.decision_function(X_test)
+        metrics["roc_auc"] = float(roc_auc_score(y_test, y_scores))
 
     metadata_extra = {
         "test_samples": int(X_test.shape[0]),
