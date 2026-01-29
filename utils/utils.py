@@ -421,7 +421,7 @@ def find_highly_correlated_features(corr_matrix, threshold=0.85):
     corr_matrix_lower = corr_matrix_copy.mask(mask)
 
     corr_matrix_selected = corr_matrix_lower
-    # Find pairs above threshold (both positive and negative)
+    # Find pairs above the threshold (both positive and negative)
     high_corr_pairs = []
     for i in range(len(corr_matrix_selected.columns)):
         for j in range(i + 1, len(corr_matrix_selected.columns)):
