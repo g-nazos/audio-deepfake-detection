@@ -517,11 +517,13 @@ def train_and_evaluate_decision_tree(
     train_path: str,
     test_path: str,
     dt_params: dict | None = None,
-    criterion: str = "gini",
+    criterion: str | None = None,
 ):
     """
     Train a Decision Tree Classifier on extracted audio features and evaluate on a test set.
     """
+    if criterion is None:
+        criterion = "gini"
     if dt_params is None:
         dt_params = {
             "max_depth": 10,
@@ -539,3 +541,10 @@ def train_and_evaluate_decision_tree(
     if criterion == "gini":
         clf = DecisionTreeClassifier(criterion="gini", **dt_params)
         
+    if criterion == "entropy":
+        clf = DecisionTreeClassifier(criterion="entropy", **dt_params)
+        
+    clf.fit(train_df, test_df["label"].map({"real": 0, "fake": 1}).values)
+    y_pred = clf.predict(test_df)
+    y_scores = clf.predict_proba(test_df)[:, 1]
+    return clf, y_pred, y_scores, dt_params, feature_names, metadata_extra
