@@ -635,7 +635,7 @@ def train_and_evaluate_decision_tree(
             "max_depth": 10,
             "min_samples_split": 5,
             "min_samples_leaf": 2,
-            "max_features": "auto",
+            "max_features": None,
             "random_state": 42,
         }
 
