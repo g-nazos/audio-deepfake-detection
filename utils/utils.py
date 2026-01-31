@@ -584,11 +584,20 @@ def grid_search_joblib(
 
     # Validation metrics for best model
     y_val_pred_best = best_model.predict(X_val)
+    if hasattr(final_model, "decision_function"):
+        y_val_scores = final_model.decision_function(X_val)
+    elif hasattr(final_model, "predict_proba"):
+        y_val_scores = final_model.predict_proba(X_val)[:, 1]
+    else:
+        raise RuntimeError("Model does not support ROC AUC scoring")
+    
     val_metrics = {
         "accuracy": float(accuracy_score(y_val, y_val_pred_best)),
         "precision": float(precision_score(y_val, y_val_pred_best, average="macro")),
         "recall": float(recall_score(y_val, y_val_pred_best, average="macro")),
         "f1": float(f1_score(y_val, y_val_pred_best, average="macro")),
+        "roc_auc": float(roc_auc_score(y_val, y_val_scores)),
+
     }
 
     # Retrain on train + val
