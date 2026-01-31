@@ -23,3 +23,9 @@ configs/config_local.py
 notebooks/experiments
 *.log
 FoR_dataset
+.idea/audio-deepfake-detection.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+
+.idea/inspectionProfiles/profiles_settings.xml
