@@ -24,8 +24,8 @@ from sklearn.metrics import (
     precision_recall_curve,
 )
 
-from sklearn.model_selection import GridSearchCV, GroupKFold
-
+from sklearn.base import clone
+from sklearn.model_selection import ParameterGrid
 
 def get_file_path(file, dataset_pathing, label):
     """
@@ -397,9 +397,7 @@ def evaluate_model_on_parquet(
         "test_file": test_path,
     }
 
-    # -------------------------
     # Optional visualizations
-    # -------------------------
     if plots:
         # Confusion Matrix (most important)
         cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
@@ -490,81 +488,126 @@ def find_highly_correlated_features(corr_matrix, threshold=0.85):
     return result_df
 
 
-def grid_search_model(
+def grid_search(
     model,
     param_grid: dict,
     train_path: str,
+    val_path: str,
     test_path: str,
     *,
     scoring: str = "f1_macro",
-    cv: int = 5,
-    n_jobs: int = -1,
-    verbose: int = 2,
+    verbose: int | None = 1,
 ):
     # Load data
     train_df = pd.read_parquet(train_path)
+    val_df = pd.read_parquet(val_path)
     test_df = pd.read_parquet(test_path)
 
     # Clean NaNs + infs
-    for df in (train_df, test_df):
+    for df in (train_df, val_df, test_df):
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
 
-    # Extract group_id from filename
-    for df in (train_df, test_df):
-        df["group_id"] = df["filename"].str.extract(r"(file\d+\.(?:wav|mp3))")[0]
-
-    # Split X, y, groups
-    def split_xy_groups(df):
-        X = df.drop(columns=["label", "filename", "group_id"], errors="ignore")
+    # Split X / y
+    def split_xy(df):
+        X = df.drop(columns=["label", "filename"], errors="ignore")
         y = df["label"].map({"real": 0, "fake": 1}).values
-        groups = df["group_id"].values
-        return X.values, y, groups, X.columns.tolist()
+        return X.values, y, X.columns.tolist()
 
-    X_train, y_train, groups_train, feature_names = split_xy_groups(train_df)
-    X_test, y_test, groups_test, _ = split_xy_groups(test_df)
+    X_train, y_train, feature_names = split_xy(train_df)
+    X_val, y_val, _ = split_xy(val_df)
+    X_test, y_test, _ = split_xy(test_df)
 
-    # GroupKFold
-    gkf = GroupKFold(n_splits=cv)
+    # Manual grid search (validation)
+    best_score = -np.inf
+    best_params = None
+    best_model = None
+    val_results = []
 
-    # Grid search with GroupKFold
-    grid = GridSearchCV(
-        estimator=model,
-        param_grid=param_grid,
-        scoring=scoring,
-        cv=gkf.split(X_train, y_train, groups_train),
-        n_jobs=n_jobs,
-        verbose=verbose,
-    )
+    grid = ParameterGrid(param_grid)
+    print(f"Number of fits:{len(list(grid))}")
+    
+    for i, params in enumerate(grid, 1):
+        candidate = clone(model).set_params(**params)
+        candidate.fit(X_train, y_train)
 
-    grid.fit(X_train, y_train)
-    best_model = grid.best_estimator_
+        y_val_pred = candidate.predict(X_val)
 
-    # Predictions
-    y_pred = best_model.predict(X_test)
+        acc = accuracy_score(y_val, y_val_pred)
+        f1 = f1_score(y_val, y_val_pred, average="macro")
 
-    # Scores for ROC AUC
-    if hasattr(best_model, "decision_function"):
-        y_scores = best_model.decision_function(X_test)
-    elif hasattr(best_model, "predict_proba"):
-        y_scores = best_model.predict_proba(X_test)[:, 1]
+        val_results.append({
+            "params": params,
+            "val_accuracy": acc,
+            "val_f1_macro": f1,
+        })
+
+        if verbose:
+            print(
+                f"[{i}] {params} | "
+                f"val_acc={acc:.4f} | val_f1={f1:.4f}"
+            )
+
+        score = f1 if scoring == "f1_macro" else acc
+
+        if score > best_score:
+            best_score = score
+            best_params = params
+            best_model = candidate
+
+    if verbose:
+        print("\nBest validation result:")
+        print(f"  params: {best_params}")
+        print(f"  {scoring}: {best_score:.4f}")
+
+    # Validation metrics for best model
+    y_val_pred_best = best_model.predict(X_val)
+
+    val_metrics = {
+        "accuracy": float(accuracy_score(y_val, y_val_pred_best)),
+        "precision": float(precision_score(y_val, y_val_pred_best, average="macro")),
+        "recall": float(recall_score(y_val, y_val_pred_best, average="macro")),
+        "f1": float(f1_score(y_val, y_val_pred_best, average="macro")),
+    }
+
+    # Retrain on train + val
+    X_final = np.vstack([X_train, X_val])
+    y_final = np.concatenate([y_train, y_val])
+
+    final_model = clone(model).set_params(**best_params)
+    final_model.fit(X_final, y_final)
+
+    # Final test evaluation
+    y_test_pred = final_model.predict(X_test)
+
+    if hasattr(final_model, "decision_function"):
+        y_scores = final_model.decision_function(X_test)
+    elif hasattr(final_model, "predict_proba"):
+        y_scores = final_model.predict_proba(X_test)[:, 1]
     else:
         raise RuntimeError("Model does not support ROC AUC scoring")
 
-    metrics = {
-        "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred, average="macro")),
-        "recall": float(recall_score(y_test, y_pred, average="macro")),
-        "f1": float(f1_score(y_test, y_pred, average="macro")),
+    test_metrics = {
+        "accuracy": float(accuracy_score(y_test, y_test_pred)),
+        "precision": float(precision_score(y_test, y_test_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_test_pred, average="macro")),
+        "f1": float(f1_score(y_test, y_test_pred, average="macro")),
         "roc_auc": float(roc_auc_score(y_test, y_scores)),
     }
 
     metadata = {
-        "cv_best_score": float(grid.best_score_),
+        "val_best_score": float(best_score),
         "train_samples": X_train.shape[0],
+        "val_samples": X_val.shape[0],
         "test_samples": X_test.shape[0],
-        "train_groups": len(np.unique(groups_train)),
-        "test_groups": len(np.unique(groups_test)),
     }
 
-    return best_model, metrics, grid.best_params_, metadata, feature_names
+    return (
+        final_model,
+        test_metrics,
+        val_metrics,
+        best_params,
+        val_results,
+        metadata,
+        feature_names,
+    )
