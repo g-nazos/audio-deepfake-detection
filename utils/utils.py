@@ -1,10 +1,12 @@
 import os
 import json
+from re import X
 import joblib
 import platform
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from sklearn.tree import DecisionTreeClassifier
 import matplotlib.pyplot as plt
 
 
@@ -24,7 +26,11 @@ from sklearn.metrics import (
     precision_recall_curve,
 )
 
-from sklearn.model_selection import GridSearchCV, GroupKFold
+
+from sklearn.base import clone
+from sklearn.model_selection import ParameterGrid
+from joblib import Parallel, delayed
+
 
 
 def get_file_path(file, dataset_pathing, label):
@@ -397,9 +403,7 @@ def evaluate_model_on_parquet(
         "test_file": test_path,
     }
 
-    # -------------------------
     # Optional visualizations
-    # -------------------------
     if plots:
         # Confusion Matrix (most important)
         cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
@@ -490,81 +494,246 @@ def find_highly_correlated_features(corr_matrix, threshold=0.85):
     return result_df
 
 
-def grid_search_model(
-    model,
-    param_grid: dict,
-    train_path: str,
-    test_path: str,
-    *,
-    scoring: str = "f1_macro",
-    cv: int = 5,
-    n_jobs: int = -1,
-    verbose: int = 2,
-):
-    # Load data
-    train_df = pd.read_parquet(train_path)
-    test_df = pd.read_parquet(test_path)
 
-    # Clean NaNs + infs
-    for df in (train_df, test_df):
+
+# Helper: load parquet and split X/y
+def load_and_prepare_data(train_path, val_path, test_path):
+    def clean_and_split(df):
+        df = df.copy()
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.dropna(inplace=True)
-
-    # Extract group_id from filename
-    for df in (train_df, test_df):
-        df["group_id"] = df["filename"].str.extract(r"(file\d+\.(?:wav|mp3))")[0]
-
-    # Split X, y, groups
-    def split_xy_groups(df):
-        X = df.drop(columns=["label", "filename", "group_id"], errors="ignore")
+        X = df.drop(columns=["label", "filename"], errors="ignore")
         y = df["label"].map({"real": 0, "fake": 1}).values
-        groups = df["group_id"].values
-        return X.values, y, groups, X.columns.tolist()
+        return X.values, y, X.columns.tolist()
 
-    X_train, y_train, groups_train, feature_names = split_xy_groups(train_df)
-    X_test, y_test, groups_test, _ = split_xy_groups(test_df)
+    train_df = pd.read_parquet(train_path)
+    val_df   = pd.read_parquet(val_path)
+    test_df  = pd.read_parquet(test_path)
 
-    # GroupKFold
-    gkf = GroupKFold(n_splits=cv)
+    X_train, y_train, feature_names = clean_and_split(train_df)
+    X_val, y_val, _ = clean_and_split(val_df)
+    X_test, y_test, _ = clean_and_split(test_df)
 
-    # Grid search with GroupKFold
-    grid = GridSearchCV(
-        estimator=model,
-        param_grid=param_grid,
-        scoring=scoring,
-        cv=gkf.split(X_train, y_train, groups_train),
-        n_jobs=n_jobs,
-        verbose=verbose,
-    )
+    return X_train, y_train, X_val, y_val, X_test, y_test, feature_names
 
-    grid.fit(X_train, y_train)
-    best_model = grid.best_estimator_
-
-    # Predictions
-    y_pred = best_model.predict(X_test)
-
-    # Scores for ROC AUC
-    if hasattr(best_model, "decision_function"):
-        y_scores = best_model.decision_function(X_test)
-    elif hasattr(best_model, "predict_proba"):
-        y_scores = best_model.predict_proba(X_test)[:, 1]
+# Helper: fit and score a single parameter set
+def _fit_and_score(params, model, X_train, y_train, X_val, y_val, scoring="f1_macro"):
+    candidate = clone(model).set_params(**params)
+    candidate.fit(X_train, y_train)
+    y_val_pred = candidate.predict(X_val)
+    if hasattr(candidate, "decision_function"):
+        y_val_scores = candidate.decision_function(X_val)
+    elif hasattr(candidate, "predict_proba"):
+        y_val_scores = candidate.predict_proba(X_val)[:, 1]
     else:
         raise RuntimeError("Model does not support ROC AUC scoring")
 
-    metrics = {
-        "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred, average="macro")),
-        "recall": float(recall_score(y_test, y_pred, average="macro")),
-        "f1": float(f1_score(y_test, y_pred, average="macro")),
+    acc = accuracy_score(y_val, y_val_pred)
+    f1 = f1_score(y_val, y_val_pred, average="macro")
+    precision = precision_score(y_val, y_val_pred, average="macro"),
+    recall = recall_score(y_val, y_val_pred, average="macro"),
+    roc_auc = roc_auc_score(y_val, y_val_scores)
+    score = f1 if scoring == "f1_macro" else acc
+
+    return {
+        "params": params,
+        "val_accuracy": acc,
+        "val_f1_macro": f1,
+        "val_precision": precision,
+        "val_recall": recall,
+        "val_roc_auc": roc_auc,
+        "selection_score": score,
+        "model": candidate
+    }
+
+# Main parallel grid search
+def grid_search_joblib(
+    model,
+    param_grid: dict,
+    train_path: str,
+    val_path: str,
+    test_path: str,
+    *,
+    scoring: str = "f1_macro",
+    verbose: int | None = 1,
+    n_jobs: int = 1,
+):
+    # Load and prepare data
+    X_train, y_train, X_val, y_val, X_test, y_test, feature_names = load_and_prepare_data(
+        train_path, val_path, test_path
+    )
+
+    # Create grid
+    grid = list(ParameterGrid(param_grid))
+    if verbose:
+        print(f"Number of fits: {len(grid)} with n_jobs={n_jobs} parallel jobs")
+
+    # Run parallel search
+    results = Parallel(n_jobs=n_jobs, verbose=10)(
+        delayed(_fit_and_score)(params, model, X_train, y_train, X_val, y_val, scoring)
+        for params in grid
+    )
+
+    # Collect results and find best
+    best_score = -np.inf
+    best_model = None
+    best_params = None
+    val_results = []
+
+    for i, res in enumerate(results, 1):
+        val_results.append(res)
+        if verbose:
+            print(f"[{i}] {res['params']} | val_acc={res['val_accuracy']:.4f} | val_f1={res['val_f1_macro']:.4f}")
+        if res["selection_score"] > best_score:
+            best_score = res["selection_score"]
+            best_model = res["model"]
+            best_params = res["params"]
+
+    if verbose:
+        print("\nBest validation result:")
+        print(f"  params: {best_params}")
+        print(f"  {scoring}: {best_score:.4f}")
+
+    # Validation metrics for best model
+    y_val_pred_best = best_model.predict(X_val)
+    if hasattr(best_model, "decision_function"):
+        y_val_best_scores = best_model.decision_function(X_val)
+    elif hasattr(best_model, "predict_proba"):
+        y_val_best_scores = best_model.predict_proba(X_val)[:, 1]
+    else:
+        raise RuntimeError("Model does not support ROC AUC scoring")
+    
+    val_metrics = {
+        "accuracy": float(accuracy_score(y_val, y_val_pred_best)),
+        "precision": float(precision_score(y_val, y_val_pred_best, average="macro")),
+        "recall": float(recall_score(y_val, y_val_pred_best, average="macro")),
+        "f1": float(f1_score(y_val, y_val_pred_best, average="macro")),
+        "roc_auc": float(roc_auc_score(y_val, y_val_best_scores)),
+
+    }
+
+    # Retrain on train + val
+    X_final = np.vstack([X_train, X_val])
+    y_final = np.concatenate([y_train, y_val])
+    final_model = clone(model).set_params(**best_params)
+    final_model.fit(X_final, y_final)
+
+    # Final test evaluation
+    y_test_pred = final_model.predict(X_test)
+    if hasattr(final_model, "decision_function"):
+        y_scores = final_model.decision_function(X_test)
+    elif hasattr(final_model, "predict_proba"):
+        y_scores = final_model.predict_proba(X_test)[:, 1]
+    else:
+        raise RuntimeError("Model does not support ROC AUC scoring")
+
+    test_metrics = {
+        "accuracy": float(accuracy_score(y_test, y_test_pred)),
+        "precision": float(precision_score(y_test, y_test_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_test_pred, average="macro")),
+        "f1": float(f1_score(y_test, y_test_pred, average="macro")),
         "roc_auc": float(roc_auc_score(y_test, y_scores)),
     }
 
     metadata = {
-        "cv_best_score": float(grid.best_score_),
+        "val_best_score": float(best_score),
         "train_samples": X_train.shape[0],
+        "val_samples": X_val.shape[0],
         "test_samples": X_test.shape[0],
-        "train_groups": len(np.unique(groups_train)),
-        "test_groups": len(np.unique(groups_test)),
     }
 
-    return best_model, metrics, grid.best_params_, metadata, feature_names
+    return (
+        final_model,
+        test_metrics,
+        val_metrics,
+        best_params,
+        val_results,
+        metadata,
+        feature_names,
+    )
+
+def train_and_evaluate_decision_tree(
+    train_path: str,
+    val_path: str | None = None,
+    test_path: str | None = None,
+    dt_params: dict | None = None,
+    criterion: str | None = None,
+):
+    """
+    Train a Decision Tree Classifier on extracted audio features and evaluate.
+
+    At least one of val_path or test_path must be provided.
+    """
+    if criterion is None:
+        criterion = "gini"
+    if dt_params is None:
+        dt_params = {
+            "max_depth": 10,
+            "min_samples_split": 5,
+            "min_samples_leaf": 2,
+            "max_features": None,
+            "random_state": 42,
+        }
+
+    train_df = pd.read_parquet(train_path)
+    train_df.dropna(inplace=True)
+    X_train = train_df.drop(columns=["label", "filename"], errors="ignore")
+    y_train = train_df["label"].map({"real": 0, "fake": 1}).values
+    feature_names = X_train.columns.tolist()
+
+    if val_path is not None:
+        val_df = pd.read_parquet(val_path)
+        val_df.dropna(inplace=True)
+        X_val = val_df.drop(columns=["label", "filename"], errors="ignore")
+        y_val = val_df["label"].map({"real": 0, "fake": 1}).values
+    else:
+        X_val = y_val = None
+
+    if test_path is not None:
+        test_df = pd.read_parquet(test_path)
+        test_df.dropna(inplace=True)
+        X_test = test_df.drop(columns=["label", "filename"], errors="ignore")
+        y_test = test_df["label"].map({"real": 0, "fake": 1}).values
+    else:
+        X_test = y_test = None
+
+    if X_test is None and X_val is None:
+        raise ValueError("At least one of val_path or test_path must be provided.")
+
+    if criterion == "gini":
+        clf = DecisionTreeClassifier(criterion="gini", **dt_params)
+    else:
+        clf = DecisionTreeClassifier(criterion="entropy", **dt_params)
+
+    clf.fit(X_train, y_train)
+    metrics = {}
+    metadata_extra = {"train_samples": X_train.shape[0]}
+
+    if X_test is not None:
+        y_pred = clf.predict(X_test)
+        y_scores = clf.predict_proba(X_test)[:, 1]
+        metadata_extra["test_samples"] = X_test.shape[0]
+        metrics["accuracy"] = float(accuracy_score(y_test, y_pred))
+        metrics["precision"] = float(precision_score(y_test, y_pred, average="macro"))
+        metrics["recall"] = float(recall_score(y_test, y_pred, average="macro"))
+        metrics["f1"] = float(f1_score(y_test, y_pred, average="macro"))
+        metrics["roc_auc"] = float(roc_auc_score(y_test, y_scores))
+
+    if X_val is not None:
+        y_val_pred = clf.predict(X_val)
+        y_val_scores = clf.predict_proba(X_val)[:, 1]
+        metadata_extra["val_samples"] = X_val.shape[0]
+        if X_test is None:
+            metrics["accuracy"] = float(accuracy_score(y_val, y_val_pred))
+            metrics["precision"] = float(precision_score(y_val, y_val_pred, average="macro"))
+            metrics["recall"] = float(recall_score(y_val, y_val_pred, average="macro"))
+            metrics["f1"] = float(f1_score(y_val, y_val_pred, average="macro"))
+            metrics["roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
+        else:
+            metrics["val_accuracy"] = float(accuracy_score(y_val, y_val_pred))
+            metrics["val_precision"] = float(precision_score(y_val, y_val_pred, average="macro"))
+            metrics["val_recall"] = float(recall_score(y_val, y_val_pred, average="macro"))
+            metrics["val_f1"] = float(f1_score(y_val, y_val_pred, average="macro"))
+            metrics["val_roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
+
+    return clf, metrics, dt_params, feature_names, metadata_extra

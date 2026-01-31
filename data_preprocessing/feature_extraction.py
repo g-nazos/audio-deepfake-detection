@@ -93,7 +93,7 @@ def aggregate_feature(matrix: np.ndarray) -> np.ndarray:
     return np.concatenate(
         [
             np.mean(matrix, axis=1),
-            np.std(matrix, axis=1),
+            # snp.std(matrix, axis=1),
             # np.min(matrix, axis=1),
             # np.max(matrix, axis=1),
         ]
@@ -135,7 +135,7 @@ def _process_single_file(args):
             n = matrix.shape[0]
             for i in range(n):
                 row_data[f"{feat_name}_mean_{i}"] = agg[i]
-                row_data[f"{feat_name}_std_{i}"] = agg[i + n]
+                # row_data[f"{feat_name}_std_{i}"] = agg[i + n]
 
         # -----------------------------
         # Handle other features
@@ -148,7 +148,7 @@ def _process_single_file(args):
             n = matrix.shape[0]
             for i in range(n):
                 row_data[f"{feat_name}_mean_{i}"] = agg[i]
-                row_data[f"{feat_name}_std_{i}"] = agg[i + n]
+                # row_data[f"{feat_name}_std_{i}"] = agg[i + n]
 
     except Exception as e:
         # Catch errors per file and log
@@ -156,7 +156,7 @@ def _process_single_file(args):
         # fill row_data with NaNs to keep DataFrame shape consistent
         for feat_name in feature_config.keys():
             row_data[f"{feat_name}_mean_0"] = np.nan
-            row_data[f"{feat_name}_std_0"] = np.nan
+            # row_data[f"{feat_name}_std_0"] = np.nan
 
     return row_data
 
@@ -276,7 +276,7 @@ if __name__ == "__main__":
         sample_rate=16000,
         num_workers=5,
     )
-    filename_parts = [f"{split}_features_{N_MFCC}_{N_FTT}_{HOP_LENGTH}"]
+    filename_parts = [f"{split}_features_mean_{N_MFCC}_{N_FTT}_{HOP_LENGTH}"]
     if "mel_spectrogram" in feature_config:
         filename_parts.append(str(N_MELS))
     """
@@ -300,5 +300,5 @@ if __name__ == "__main__":
 
     print(df.head())
     print(df.shape)
-    print(df.isna().sum().max())
+    print(f"Number of NaNs: {df.isna().sum().max()}")
     print(df.columns)
