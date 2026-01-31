@@ -233,10 +233,6 @@ def extract_features_from_folder(
 
 
 if __name__ == "__main__":
-    # N_MFCC = 40
-    # N_FTT = 2048
-    # HOP_LENGTH = 512
-    # N_MELS = 128
     N_MFCC = 20
     N_FTT = 128
     HOP_LENGTH = 256
@@ -259,23 +255,42 @@ if __name__ == "__main__":
         # Mel spectrogram
         "mel_spectrogram": {"n_mels": N_MELS},
     }
-
+    """
+    #FoR feature extraction
     base_path = DATASET_PATH
-    split = "testing"
+    split = "training"
     folder_path = os.path.join(base_path, split)
+    """
+    from configs.config_local import (
+        ITW_FEATURES_TRIMMED_LOUDNORM_PATH,
+        ITW_TRIMMED_LOUDNORM_DATASET_PATH,
+    )
+
+    base_path = ITW_TRIMMED_LOUDNORM_DATASET_PATH
+    split = "itw"
+    folder_path = os.path.join(base_path)
+
     df = extract_features_from_folder(
         folder_path=folder_path,
         feature_config=feature_config,
         sample_rate=16000,
-        num_workers=None,
+        num_workers=5,
     )
     filename_parts = [f"{split}_features_mean_{N_MFCC}_{N_FTT}_{HOP_LENGTH}"]
     if "mel_spectrogram" in feature_config:
         filename_parts.append(str(N_MELS))
+    """
+    #FoR output path
     output_path = os.path.join(
         PROJECT_ROOT,
         "FoR_dataset",
         "features",
+        "_".join(filename_parts) + ".parquet",
+    )
+    """
+    # ITW output path
+    output_path = os.path.join(
+        ITW_FEATURES_TRIMMED_LOUDNORM_PATH,
         "_".join(filename_parts) + ".parquet",
     )
     print(f"Saving features to {output_path}")
