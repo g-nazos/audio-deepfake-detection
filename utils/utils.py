@@ -26,8 +26,12 @@ from sklearn.metrics import (
     precision_recall_curve,
 )
 
+
 from sklearn.base import clone
 from sklearn.model_selection import ParameterGrid
+from joblib import Parallel, delayed
+
+
 
 def get_file_path(file, dataset_pathing, label):
     """
@@ -490,7 +494,48 @@ def find_highly_correlated_features(corr_matrix, threshold=0.85):
     return result_df
 
 
-def grid_search(
+
+
+# Helper: load parquet and split X/y
+def load_and_prepare_data(train_path, val_path, test_path):
+    def clean_and_split(df):
+        df = df.copy()
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.dropna(inplace=True)
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values
+        return X.values, y, X.columns.tolist()
+
+    train_df = pd.read_parquet(train_path)
+    val_df   = pd.read_parquet(val_path)
+    test_df  = pd.read_parquet(test_path)
+
+    X_train, y_train, feature_names = clean_and_split(train_df)
+    X_val, y_val, _ = clean_and_split(val_df)
+    X_test, y_test, _ = clean_and_split(test_df)
+
+    return X_train, y_train, X_val, y_val, X_test, y_test, feature_names
+
+# Helper: fit and score a single parameter set
+def _fit_and_score(params, model, X_train, y_train, X_val, y_val, scoring="f1_macro"):
+    candidate = clone(model).set_params(**params)
+    candidate.fit(X_train, y_train)
+    y_val_pred = candidate.predict(X_val)
+
+    acc = accuracy_score(y_val, y_val_pred)
+    f1 = f1_score(y_val, y_val_pred, average="macro")
+    score = f1 if scoring == "f1_macro" else acc
+
+    return {
+        "params": params,
+        "val_accuracy": acc,
+        "val_f1_macro": f1,
+        "selection_score": score,
+        "model": candidate
+    }
+
+# Main parallel grid search
+def grid_search_joblib(
     model,
     param_grid: dict,
     train_path: str,
@@ -499,63 +544,38 @@ def grid_search(
     *,
     scoring: str = "f1_macro",
     verbose: int | None = 1,
+    n_jobs: int = 1,
 ):
-    # Load data
-    train_df = pd.read_parquet(train_path)
-    val_df = pd.read_parquet(val_path)
-    test_df = pd.read_parquet(test_path)
+    # Load and prepare data
+    X_train, y_train, X_val, y_val, X_test, y_test, feature_names = load_and_prepare_data(
+        train_path, val_path, test_path
+    )
 
-    # Clean NaNs + infs
-    for df in (train_df, val_df, test_df):
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
+    # Create grid
+    grid = list(ParameterGrid(param_grid))
+    if verbose:
+        print(f"Number of fits: {len(grid)} with n_jobs={n_jobs} parallel jobs")
 
-    # Split X / y
-    def split_xy(df):
-        X = df.drop(columns=["label", "filename"], errors="ignore")
-        y = df["label"].map({"real": 0, "fake": 1}).values
-        return X.values, y, X.columns.tolist()
+    # Run parallel search
+    results = Parallel(n_jobs=n_jobs, verbose=10)(
+        delayed(_fit_and_score)(params, model, X_train, y_train, X_val, y_val, scoring)
+        for params in grid
+    )
 
-    X_train, y_train, feature_names = split_xy(train_df)
-    X_val, y_val, _ = split_xy(val_df)
-    X_test, y_test, _ = split_xy(test_df)
-
-    # Manual grid search (validation)
+    # Collect results and find best
     best_score = -np.inf
-    best_params = None
     best_model = None
+    best_params = None
     val_results = []
 
-    grid = ParameterGrid(param_grid)
-    print(f"Number of fits:{len(list(grid))}")
-    
-    for i, params in enumerate(grid, 1):
-        candidate = clone(model).set_params(**params)
-        candidate.fit(X_train, y_train)
-
-        y_val_pred = candidate.predict(X_val)
-
-        acc = accuracy_score(y_val, y_val_pred)
-        f1 = f1_score(y_val, y_val_pred, average="macro")
-
-        val_results.append({
-            "params": params,
-            "val_accuracy": acc,
-            "val_f1_macro": f1,
-        })
-
+    for i, res in enumerate(results, 1):
+        val_results.append(res)
         if verbose:
-            print(
-                f"[{i}] {params} | "
-                f"val_acc={acc:.4f} | val_f1={f1:.4f}"
-            )
-
-        score = f1 if scoring == "f1_macro" else acc
-
-        if score > best_score:
-            best_score = score
-            best_params = params
-            best_model = candidate
+            print(f"[{i}] {res['params']} | val_acc={res['val_accuracy']:.4f} | val_f1={res['val_f1_macro']:.4f}")
+        if res["selection_score"] > best_score:
+            best_score = res["selection_score"]
+            best_model = res["model"]
+            best_params = res["params"]
 
     if verbose:
         print("\nBest validation result:")
@@ -564,7 +584,6 @@ def grid_search(
 
     # Validation metrics for best model
     y_val_pred_best = best_model.predict(X_val)
-
     val_metrics = {
         "accuracy": float(accuracy_score(y_val, y_val_pred_best)),
         "precision": float(precision_score(y_val, y_val_pred_best, average="macro")),
@@ -575,13 +594,11 @@ def grid_search(
     # Retrain on train + val
     X_final = np.vstack([X_train, X_val])
     y_final = np.concatenate([y_train, y_val])
-
     final_model = clone(model).set_params(**best_params)
     final_model.fit(X_final, y_final)
 
     # Final test evaluation
     y_test_pred = final_model.predict(X_test)
-
     if hasattr(final_model, "decision_function"):
         y_scores = final_model.decision_function(X_test)
     elif hasattr(final_model, "predict_proba"):
@@ -613,8 +630,6 @@ def grid_search(
         metadata,
         feature_names,
     )
-
-    return best_model, metrics, grid.best_params_, metadata, feature_names
 
 def train_and_evaluate_decision_tree(
     train_path: str,
