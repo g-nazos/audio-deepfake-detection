@@ -521,15 +521,27 @@ def _fit_and_score(params, model, X_train, y_train, X_val, y_val, scoring="f1_ma
     candidate = clone(model).set_params(**params)
     candidate.fit(X_train, y_train)
     y_val_pred = candidate.predict(X_val)
+    if hasattr(candidate, "decision_function"):
+        y_val_scores = candidate.decision_function(X_val)
+    elif hasattr(candidate, "predict_proba"):
+        y_val_scores = candidate.predict_proba(X_val)[:, 1]
+    else:
+        raise RuntimeError("Model does not support ROC AUC scoring")
 
     acc = accuracy_score(y_val, y_val_pred)
     f1 = f1_score(y_val, y_val_pred, average="macro")
+    precision = precision_score(y_val, y_val_pred, average="macro"),
+    recall = recall_score(y_val, y_val_pred, average="macro"),
+    roc_auc = roc_auc_score(y_val, y_val_scores)
     score = f1 if scoring == "f1_macro" else acc
 
     return {
         "params": params,
         "val_accuracy": acc,
         "val_f1_macro": f1,
+        "val_precision": precision,
+        "val_recall": recall,
+        "val_roc_auc": roc_auc,
         "selection_score": score,
         "model": candidate
     }
@@ -584,10 +596,10 @@ def grid_search_joblib(
 
     # Validation metrics for best model
     y_val_pred_best = best_model.predict(X_val)
-    if hasattr(final_model, "decision_function"):
-        y_val_scores = final_model.decision_function(X_val)
-    elif hasattr(final_model, "predict_proba"):
-        y_val_scores = final_model.predict_proba(X_val)[:, 1]
+    if hasattr(best_model, "decision_function"):
+        y_val_best_scores = best_model.decision_function(X_val)
+    elif hasattr(best_model, "predict_proba"):
+        y_val_best_scores = best_model.predict_proba(X_val)[:, 1]
     else:
         raise RuntimeError("Model does not support ROC AUC scoring")
     
@@ -596,7 +608,7 @@ def grid_search_joblib(
         "precision": float(precision_score(y_val, y_val_pred_best, average="macro")),
         "recall": float(recall_score(y_val, y_val_pred_best, average="macro")),
         "f1": float(f1_score(y_val, y_val_pred_best, average="macro")),
-        "roc_auc": float(roc_auc_score(y_val, y_val_scores)),
+        "roc_auc": float(roc_auc_score(y_val, y_val_best_scores)),
 
     }
 
