@@ -10,7 +10,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 
-
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.svm import SVC
@@ -757,84 +759,84 @@ def train_and_evaluate_random_forest(
     val_path: str | None = None,
     test_path: str | None = None,
     rf_params: dict | None = None,
-    criterion: str | None = None,
 ):
-    """
-    Train a Random Forest Classifier on extracted audio features and evaluate.
 
-    At least one of val_path or test_path must be provided.
-    """
-    if criterion is None:
-        criterion = "gini"
-    if rf_params is None:
-        rf_params = {
-            "n_estimators": 100,
-            "max_depth": 10,
-            "min_samples_split": 5,
-            "min_samples_leaf": 2,
-            "max_features": "sqrt",
-            "random_state": 42,
-        }
+    default_params = {
+        "n_estimators": 100,
+        "max_features": "sqrt",
+        "criterion": "gini",
+        #"class_weight": "balanced",
+        "random_state": 42,
+        "bootstrap": True,
+        "oob_score": True,
+        "n_jobs": -1
+    }
+    # Update defaults with user provided params
+    if rf_params:
+        default_params.update(rf_params)
 
-    train_df = pd.read_parquet(train_path)
-    train_df.dropna(inplace=True)
-    X_train = train_df.drop(columns=["label", "filename"], errors="ignore")
-    y_train = train_df["label"].map({"real": 0, "fake": 1}).values
-    feature_names = X_train.columns.tolist()
+    pipeline = Pipeline([
+        ('imputer', SimpleImputer(strategy='median')),
+        ('rf', RandomForestClassifier(**default_params))
+    ])
 
-    if val_path is not None:
-        val_df = pd.read_parquet(val_path)
-        val_df.dropna(inplace=True)
-        X_val = val_df.drop(columns=["label", "filename"], errors="ignore")
-        y_val = val_df["label"].map({"real": 0, "fake": 1}).values
-    else:
-        X_val = y_val = None
+    def load_data(path):
+        if path is None:
+            return None, None
+        df = pd.read_parquet(path)
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values # type: ignore
+        return X, y
 
-    if test_path is not None:
-        test_df = pd.read_parquet(test_path)
-        test_df.dropna(inplace=True)
-        X_test = test_df.drop(columns=["label", "filename"], errors="ignore")
-        y_test = test_df["label"].map({"real": 0, "fake": 1}).values
-    else:
-        X_test = y_test = None
+    X_train, y_train = load_data(train_path)
+    X_val, y_val = load_data(val_path)
+    X_test, y_test = load_data(test_path)
 
     if X_test is None and X_val is None:
         raise ValueError("At least one of val_path or test_path must be provided.")
 
-    if criterion == "gini":
-        clf = RandomForestClassifier(criterion="gini", **rf_params)
-    else:
-        clf = RandomForestClassifier(criterion="entropy", **rf_params)
+    feature_names = X_train.columns.tolist() # type: ignore
+    metadata_extra = {"train_samples": X_train.shape[0]} # type: ignore
 
-    clf.fit(X_train, y_train)
+    print(f"Training on {X_train.shape[0]} samples with {len(feature_names)} features...") # type: ignore
+    pipeline.fit(X_train, y_train)
+
+
+    def get_metrics(X, y, prefix=""):
+        if X is None: 
+            return {}
+        
+        y_pred = pipeline.predict(X)
+        y_probs = pipeline.predict_proba(X)[:, 1] # Probability of 'fake' (Class 1)
+        
+        # Determine prefix for dictionary keys (e.g., 'val_accuracy')
+        p = f"{prefix}_" if prefix else ""
+        
+        return {
+            f"{p}accuracy": float(accuracy_score(y, y_pred)),
+            f"{p}precision": float(precision_score(y, y_pred, average="macro")), # Binary (default)
+            f"{p}recall": float(recall_score(y, y_pred, average="macro")),       # Binary (default)
+            f"{p}f1": float(f1_score(y, y_pred, average="macro")),               # Binary (default)
+            f"{p}roc_auc": float(roc_auc_score(y, y_probs))
+        }
+
     metrics = {}
-    metadata_extra = {"train_samples": X_train.shape[0]}
-
+    
+    # Calculate Test Metrics
     if X_test is not None:
-        y_pred = clf.predict(X_test)
-        y_scores = clf.predict_proba(X_test)[:, 1]
         metadata_extra["test_samples"] = X_test.shape[0]
-        metrics["accuracy"] = float(accuracy_score(y_test, y_pred))
-        metrics["precision"] = float(precision_score(y_test, y_pred, average="macro"))
-        metrics["recall"] = float(recall_score(y_test, y_pred, average="macro"))
-        metrics["f1"] = float(f1_score(y_test, y_pred, average="macro"))
-        metrics["roc_auc"] = float(roc_auc_score(y_test, y_scores))
+        metrics.update(get_metrics(X_test, y_test, prefix=""))
 
+    # Calculate Val Metrics
     if X_val is not None:
-        y_val_pred = clf.predict(X_val)
-        y_val_scores = clf.predict_proba(X_val)[:, 1]
         metadata_extra["val_samples"] = X_val.shape[0]
-        if X_test is None:
-            metrics["accuracy"] = float(accuracy_score(y_val, y_val_pred))
-            metrics["precision"] = float(precision_score(y_val, y_val_pred, average="macro"))
-            metrics["recall"] = float(recall_score(y_val, y_val_pred, average="macro"))
-            metrics["f1"] = float(f1_score(y_val, y_val_pred, average="macro"))
-            metrics["roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
-        else:
-            metrics["val_accuracy"] = float(accuracy_score(y_val, y_val_pred))
-            metrics["val_precision"] = float(precision_score(y_val, y_val_pred, average="macro"))
-            metrics["val_recall"] = float(recall_score(y_val, y_val_pred, average="macro"))
-            metrics["val_f1"] = float(f1_score(y_val, y_val_pred, average="macro"))
-            metrics["val_roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
+        # If we have both, prefix val metrics with 'val_'
+        prefix = "val" if X_test is not None else "" 
+        metrics.update(get_metrics(X_val, y_val, prefix=prefix))
 
-    return clf, metrics, rf_params, feature_names, metadata_extra
+    # Safely get OOB score (only exists if bootstrap=True and oob_score=True)
+    oob_score = None
+    if default_params.get("bootstrap") and default_params.get("oob_score"):
+        oob_score = pipeline.named_steps['rf'].oob_score_
+
+    return pipeline, metrics, default_params, feature_names, metadata_extra, oob_score
