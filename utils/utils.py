@@ -7,6 +7,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 
 
@@ -749,3 +750,91 @@ def train_and_evaluate_decision_tree(
             metrics["val_roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
 
     return clf, metrics, dt_params, feature_names, metadata_extra
+
+
+def train_and_evaluate_random_forest(
+    train_path: str,
+    val_path: str | None = None,
+    test_path: str | None = None,
+    rf_params: dict | None = None,
+    criterion: str | None = None,
+):
+    """
+    Train a Random Forest Classifier on extracted audio features and evaluate.
+
+    At least one of val_path or test_path must be provided.
+    """
+    if criterion is None:
+        criterion = "gini"
+    if rf_params is None:
+        rf_params = {
+            "n_estimators": 100,
+            "max_depth": 10,
+            "min_samples_split": 5,
+            "min_samples_leaf": 2,
+            "max_features": "sqrt",
+            "random_state": 42,
+        }
+
+    train_df = pd.read_parquet(train_path)
+    train_df.dropna(inplace=True)
+    X_train = train_df.drop(columns=["label", "filename"], errors="ignore")
+    y_train = train_df["label"].map({"real": 0, "fake": 1}).values
+    feature_names = X_train.columns.tolist()
+
+    if val_path is not None:
+        val_df = pd.read_parquet(val_path)
+        val_df.dropna(inplace=True)
+        X_val = val_df.drop(columns=["label", "filename"], errors="ignore")
+        y_val = val_df["label"].map({"real": 0, "fake": 1}).values
+    else:
+        X_val = y_val = None
+
+    if test_path is not None:
+        test_df = pd.read_parquet(test_path)
+        test_df.dropna(inplace=True)
+        X_test = test_df.drop(columns=["label", "filename"], errors="ignore")
+        y_test = test_df["label"].map({"real": 0, "fake": 1}).values
+    else:
+        X_test = y_test = None
+
+    if X_test is None and X_val is None:
+        raise ValueError("At least one of val_path or test_path must be provided.")
+
+    if criterion == "gini":
+        clf = RandomForestClassifier(criterion="gini", **rf_params)
+    else:
+        clf = RandomForestClassifier(criterion="entropy", **rf_params)
+
+    clf.fit(X_train, y_train)
+    metrics = {}
+    metadata_extra = {"train_samples": X_train.shape[0]}
+
+    if X_test is not None:
+        y_pred = clf.predict(X_test)
+        y_scores = clf.predict_proba(X_test)[:, 1]
+        metadata_extra["test_samples"] = X_test.shape[0]
+        metrics["accuracy"] = float(accuracy_score(y_test, y_pred))
+        metrics["precision"] = float(precision_score(y_test, y_pred, average="macro"))
+        metrics["recall"] = float(recall_score(y_test, y_pred, average="macro"))
+        metrics["f1"] = float(f1_score(y_test, y_pred, average="macro"))
+        metrics["roc_auc"] = float(roc_auc_score(y_test, y_scores))
+
+    if X_val is not None:
+        y_val_pred = clf.predict(X_val)
+        y_val_scores = clf.predict_proba(X_val)[:, 1]
+        metadata_extra["val_samples"] = X_val.shape[0]
+        if X_test is None:
+            metrics["accuracy"] = float(accuracy_score(y_val, y_val_pred))
+            metrics["precision"] = float(precision_score(y_val, y_val_pred, average="macro"))
+            metrics["recall"] = float(recall_score(y_val, y_val_pred, average="macro"))
+            metrics["f1"] = float(f1_score(y_val, y_val_pred, average="macro"))
+            metrics["roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
+        else:
+            metrics["val_accuracy"] = float(accuracy_score(y_val, y_val_pred))
+            metrics["val_precision"] = float(precision_score(y_val, y_val_pred, average="macro"))
+            metrics["val_recall"] = float(recall_score(y_val, y_val_pred, average="macro"))
+            metrics["val_f1"] = float(f1_score(y_val, y_val_pred, average="macro"))
+            metrics["val_roc_auc"] = float(roc_auc_score(y_val, y_val_scores))
+
+    return clf, metrics, rf_params, feature_names, metadata_extra
