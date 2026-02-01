@@ -283,6 +283,7 @@ def save_experiment(
     model_params: dict | None = None,
     feature_names: list | None = None,
     metadata_extra: dict | None = None,
+    val_results: list | None = None,
 ):
     """
     Save a trained model, evaluation metrics, model parameters, and metadata
@@ -310,6 +311,9 @@ def save_experiment(
 
     metadata_extra : dict, optional
         Additional metadata to save (dataset info, notes, etc.).
+
+    val_results : list, optional
+        List of validation results.
 
     Returns
     -------
@@ -351,6 +355,14 @@ def save_experiment(
 
     with open(os.path.join(exp_path, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=4)
+
+    if val_results is not None:
+        val_results_serializable = [
+            {k: v for k, v in r.items() if k != "model"}
+            for r in val_results
+        ]
+        with open(os.path.join(exp_path, "val_results.json"), "w") as f:
+            json.dump(val_results_serializable, f, indent=4)
 
     print(f"Experiment saved to: {exp_path}")
     return exp_path
