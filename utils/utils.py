@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 
 from sklearn.pipeline import Pipeline
@@ -840,3 +841,91 @@ def train_and_evaluate_random_forest(
         oob_score = pipeline.named_steps['rf'].oob_score_
 
     return pipeline, metrics, default_params, feature_names, metadata_extra, oob_score
+
+
+
+def train_and_evaluate_xgboost(
+    train_path: str,
+    val_path: str | None = None,
+    test_path: str | None = None,
+    xgb_params: dict | None = None,
+):
+    def load_data(path):
+        if path is None: return None, None
+        df = pd.read_parquet(path)
+        X = df.drop(columns=["label", "filename"], errors="ignore")
+        y = df["label"].map({"real": 0, "fake": 1}).values # type: ignore
+        return X, y
+
+    X_train, y_train = load_data(train_path)
+    X_val, y_val = load_data(val_path)
+    X_test, y_test = load_data(test_path)
+
+    if X_test is None and X_val is None:
+        raise ValueError("At least one of val_path or test_path must be provided.")
+
+    feature_names = X_train.columns.tolist()
+    metadata_extra = {"train_samples": X_train.shape[0]}
+
+    if xgb_params is None: xgb_params = {}
+    
+    if "scale_pos_weight" not in xgb_params:
+        num_neg = np.sum(y_train == 0) # Real
+        num_pos = np.sum(y_train == 1) # Fake
+        if num_pos > 0:
+            scale_weight = num_neg / num_pos
+            xgb_params["scale_pos_weight"] = scale_weight
+            print(f"Scale_pos_weight: {scale_weight:.2f}")
+
+    default_params = {
+        "max_depth": 6,
+        "learning_rate": 0.1,
+        "subsample": 0.8,
+        "gamma": 0.0,
+        "colsample_bytree": 0.7,
+        "n_jobs": -1,
+        "verbosity": 2,
+        "early_stopping_rounds": 10,
+        "eval_metric": 'aucpr',
+        "eval_set": [(X_val, y_val)],
+    }
+    default_params.update(xgb_params)
+
+    # 4. Define the Pipeline
+    # XGBoost handles NaNs natively, but SimpleImputer is safer for consistency
+    pipeline = Pipeline([
+        ('imputer', SimpleImputer(strategy='median')),
+        ('xgb', XGBClassifier(**default_params))
+    ])
+
+    # 5. Train
+    print(f"Training XGBoost on {X_train.shape[0]} samples...")
+    pipeline.fit(X_train, y_train)
+
+    # 6. Evaluation Helper (Same logic as before)
+    def get_metrics(X, y, prefix=""):
+        if X is None: return {}
+        y_pred = pipeline.predict(X)
+        y_probs = pipeline.predict_proba(X)[:, 1]
+        p = f"{prefix}_" if prefix else ""
+        return {
+            f"{p}accuracy": float(accuracy_score(y, y_pred)),
+            f"{p}precision": float(precision_score(y, y_pred, average="macro")),
+            f"{p}recall": float(recall_score(y, y_pred, average="macro")),
+            f"{p}f1": float(f1_score(y, y_pred, average="macro")),
+            f"{p}roc_auc": float(roc_auc_score(y, y_probs))
+        }
+
+    # 7. Collect Results
+    metrics = {}
+    if X_test is not None:
+        metadata_extra["test_samples"] = X_test.shape[0]
+        metrics.update(get_metrics(X_test, y_test, prefix=""))
+
+    if X_val is not None:
+        metadata_extra["val_samples"] = X_val.shape[0]
+        prefix = "val" if X_test is not None else "" 
+        metrics.update(get_metrics(X_val, y_val, prefix=prefix))
+
+    # XGBoost doesn't have OOB score, so we return None
+    return pipeline, metrics, default_params, feature_names, metadata_extra, None
