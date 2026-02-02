@@ -877,32 +877,40 @@ def train_and_evaluate_xgboost(
             xgb_params["scale_pos_weight"] = scale_weight
             print(f"Scale_pos_weight: {scale_weight:.2f}")
 
-    default_params = {
-        "max_depth": 6,
-        "learning_rate": 0.1,
-        "subsample": 0.8,
-        "gamma": 0.0,
-        "colsample_bytree": 0.7,
-        "n_jobs": -1,
-        "verbosity": 2,
-        "early_stopping_rounds": 10,
-        "eval_metric": 'aucpr',
-        "eval_set": [(X_val, y_val)],
-    }
+    # default_params = {
+    #     "max_depth": 6,
+    #     "learning_rate": 0.1,
+    #     "subsample": 0.8,
+    #     "gamma": 0.0,
+    #     "colsample_bytree": 0.7,
+    #     "n_jobs": -1,
+    #     "verbosity": 2,
+    #     "eval_metric": "aucpr",
+    # }
+    
+    default_params = {}
     default_params.update(xgb_params)
 
-    # 4. Define the Pipeline
-    # XGBoost handles NaNs natively, but SimpleImputer is safer for consistency
     pipeline = Pipeline([
-        ('imputer', SimpleImputer(strategy='median')),
-        ('xgb', XGBClassifier(**default_params))
+        ("imputer", SimpleImputer(strategy="median")),
+        ("xgb", XGBClassifier(**default_params)),
     ])
 
-    # 5. Train
     print(f"Training XGBoost on {X_train.shape[0]} samples...")
-    pipeline.fit(X_train, y_train)
+    pipeline.named_steps["imputer"].fit(X_train)
+    X_train_imp = pipeline.named_steps["imputer"].transform(X_train)
 
-    # 6. Evaluation Helper (Same logic as before)
+    if X_val is not None:
+        X_val_imp = pipeline.named_steps["imputer"].transform(X_val)
+        #pipeline.named_steps["xgb"].set_params(early_stopping_rounds=5)
+        pipeline.named_steps["xgb"].fit(
+            X_train_imp,
+            y_train,
+            eval_set=[(X_val_imp, y_val)],
+        )
+    else:
+        pipeline.named_steps["xgb"].fit(X_train_imp, y_train)
+
     def get_metrics(X, y, prefix=""):
         if X is None: return {}
         y_pred = pipeline.predict(X)
@@ -916,7 +924,6 @@ def train_and_evaluate_xgboost(
             f"{p}roc_auc": float(roc_auc_score(y, y_probs))
         }
 
-    # 7. Collect Results
     metrics = {}
     if X_test is not None:
         metadata_extra["test_samples"] = X_test.shape[0]
@@ -927,5 +934,4 @@ def train_and_evaluate_xgboost(
         prefix = "val" if X_test is not None else "" 
         metrics.update(get_metrics(X_val, y_val, prefix=prefix))
 
-    # XGBoost doesn't have OOB score, so we return None
-    return pipeline, metrics, default_params, feature_names, metadata_extra, None
+    return pipeline, metrics, default_params, feature_names, metadata_extra
