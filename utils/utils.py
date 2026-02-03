@@ -850,25 +850,29 @@ def train_and_evaluate_xgboost(
     test_path: str | None = None,
     xgb_params: dict | None = None,
 ):
+    X_train, y_train, X_val, y_val, X_test, y_test, feature_names = load_and_prepare_data(train_path, val_path, test_path)
+    """
     def load_data(path):
         if path is None: return None, None
         df = pd.read_parquet(path)
         X = df.drop(columns=["label", "filename"], errors="ignore")
         y = df["label"].map({"real": 0, "fake": 1}).values # type: ignore
         return X, y
-
     X_train, y_train = load_data(train_path)
     X_val, y_val = load_data(val_path)
-    X_test, y_test = load_data(test_path)
+    X_test, y_test = load_data(test_path)    
+    """
+
+
 
     if X_test is None and X_val is None:
         raise ValueError("At least one of val_path or test_path must be provided.")
 
-    feature_names = X_train.columns.tolist()
+    #feature_names = X_train.columns.tolist()
     metadata_extra = {"train_samples": X_train.shape[0]}
 
     if xgb_params is None: xgb_params = {}
-    
+    """    
     if "scale_pos_weight" not in xgb_params:
         num_neg = np.sum(y_train == 0) # Real
         num_pos = np.sum(y_train == 1) # Fake
@@ -876,6 +880,8 @@ def train_and_evaluate_xgboost(
             scale_weight = num_neg / num_pos
             xgb_params["scale_pos_weight"] = scale_weight
             print(f"Scale_pos_weight: {scale_weight:.2f}")
+    """
+
 
     # default_params = {
     #     "max_depth": 6,
