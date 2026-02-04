@@ -278,7 +278,7 @@ if __name__ == "__main__":
     )
 
     base_path = ELEVEN_LABS_DATASET_PATH
-    split = "itw"
+    split = "eleven_labs"
     folder_path = os.path.join(base_path)
 
     df = extract_features_from_folder(
