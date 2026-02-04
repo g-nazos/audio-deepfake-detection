@@ -261,12 +261,23 @@ if __name__ == "__main__":
     split = "training"
     folder_path = os.path.join(base_path, split)
     """
+    """
+    #itw feature extraction
     from configs.config_local import (
         ITW_FEATURES_TRIMMED_LOUDNORM_PATH,
         ITW_TRIMMED_LOUDNORM_DATASET_PATH,
     )
 
     base_path = ITW_TRIMMED_LOUDNORM_DATASET_PATH
+    split = "itw"
+    folder_path = os.path.join(base_path)
+    """
+    from configs.config_local import (
+        ELEVEN_LABS_DATASET_PATH,
+        ELEVEN_LABS_FEATURES_PATH,
+    )
+
+    base_path = ELEVEN_LABS_DATASET_PATH
     split = "itw"
     folder_path = os.path.join(base_path)
 
@@ -290,7 +301,7 @@ if __name__ == "__main__":
     """
     # ITW output path
     output_path = os.path.join(
-        ITW_FEATURES_TRIMMED_LOUDNORM_PATH,
+        ELEVEN_LABS_FEATURES_PATH,
         "_".join(filename_parts) + ".parquet",
     )
     print(f"Saving features to {output_path}")
