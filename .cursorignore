@@ -1,0 +1,9 @@
+.venv/
+.idea/
+.gitignore
+.cursorignore
+.cursorrules
+.cursorconfig
+.cursorconfig.yaml
+.cursorconfig.yaml
+.env
