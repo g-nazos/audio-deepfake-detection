@@ -5,7 +5,7 @@ import importlib
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 importlib.import_module("eleven_utils")
-from eleven_utils import raw_text, paragraphs_from_text
+from eleven_utils import raw_text, paragraphs_from_text, greek_raw_text
 
 load_dotenv()
 
@@ -18,22 +18,32 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 OUTPUT_DIR = Path("elevenlabs-dataset/fake")
+OUTPUT_DIR_EL = Path("elevenlabs-dataset/el")
 
 elevenlabs = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
-paragraphs = paragraphs_from_text(text=raw_text, words_per_paragraph=13)
+paragraphs = paragraphs_from_text(text=greek_raw_text, words_per_paragraph=13)
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR_EL.mkdir(parents=True, exist_ok=True)
 request_ids = []
 total_character_cost = 0
 
-for idx, paragraph in enumerate(paragraphs, start=1):
+for idx, paragraph in enumerate(paragraphs, start=66):
     with elevenlabs.text_to_speech.with_raw_response.convert(
         text=paragraph,
-        voice_id=os.getenv("GEORGE_VOICE_ID"),
+        voice_id=os.getenv("KOSTAS_VOICE_ID"),
         model_id="eleven_multilingual_v2",
         previous_request_ids=request_ids[-3:],
         output_format="wav_16000",
+        language_code="el",
+        voice_settings={
+            "use_speaker_boost": True,
+            "similarity_boost": 0.9,
+            "style": 0.5,
+            "stability": 0.5,
+            "speed": 0.9,
+        }
     ) as response:
         raw = getattr(response, "_response", response)
         headers = getattr(raw, "headers", getattr(response, "headers", {}))
@@ -60,7 +70,7 @@ for idx, paragraph in enumerate(paragraphs, start=1):
                 len(audio_data),
             )
 
-    out_path = OUTPUT_DIR / f"file{idx:03d}.wav"
+    out_path = OUTPUT_DIR_EL / f"file{idx:03d}.wav"
     out_path.write_bytes(audio_data)
     logger.info("Wrote %s", out_path)
 
