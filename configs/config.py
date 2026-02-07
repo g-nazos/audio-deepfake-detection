@@ -10,3 +10,4 @@ ITW_FEATURES_DIR = os.path.join(PROJECT_ROOT, "in-the-wild-audio-deepfake", "fea
 ELEVEN_LABS_FEATURES_PATH = os.path.join(PROJECT_ROOT, "elevenlabs-dataset", "features")
 ELEVEN_LABS_DATASET_PATH = os.path.join(PROJECT_ROOT, "elevenlabs-dataset")
 MODELS_PATH = os.path.join(PROJECT_ROOT, "notebooks", "experiments")
+FINAL_MODELS_PATH = os.path.join(PROJECT_ROOT, "notebooks", "experiments", "final")
