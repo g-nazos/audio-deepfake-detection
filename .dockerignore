@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.git/
+*.pyc
+*.wav
+FoR_dataset/
+in-the-wild-audio-deepfake/
+elevenlabs-dataset/
+.idea/
