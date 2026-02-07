@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_DATASET_PATH = os.path.join(PROJECT_ROOT, "FoR_dataset", "for-norm", "for-norm")
 
 try:
-    from configs.config_local import DATASET_PATH
+    from configs.config import DATASET_PATH
 except ImportError:
     DATASET_PATH = None
 
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     """
     """
     #itw feature extraction
-    from configs.config_local import (
+    from configs.config import (
         ITW_FEATURES_TRIMMED_LOUDNORM_PATH,
         ITW_TRIMMED_LOUDNORM_DATASET_PATH,
     )
@@ -272,7 +272,7 @@ if __name__ == "__main__":
     split = "itw"
     folder_path = os.path.join(base_path)
     """
-    from configs.config_local import (
+    from configs.config import (
         ELEVEN_LABS_DATASET_PATH,
         ELEVEN_LABS_FEATURES_PATH,
     )
