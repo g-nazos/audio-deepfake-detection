@@ -551,7 +551,7 @@ def _fit_and_score(params, model, X_train, y_train, X_val, y_val, scoring="f1_ma
     roc_auc = roc_auc_score(y_val, y_val_scores)
     score = f1 if scoring == "f1_macro" else acc
 
-    return {
+    result = {
         "params": params,
         "val_accuracy": acc,
         "val_f1_macro": f1,
@@ -561,6 +561,8 @@ def _fit_and_score(params, model, X_train, y_train, X_val, y_val, scoring="f1_ma
         "selection_score": score,
         "model": candidate
     }
+    print(f"[done] acc={acc:.4f} | f1={f1:.4f} | roc_auc={roc_auc:.4f} | {params}")
+    return result
 
 # Main parallel grid search
 def grid_search_joblib(
@@ -630,7 +632,7 @@ def grid_search_joblib(
     if verbose:
         print(f"Number of fits: {len(grid)} with n_jobs={n_jobs} parallel jobs")
 
-    # Run parallel search
+    # Run parallel search (prefer threads so worker prints reach notebook)
     results = Parallel(n_jobs=n_jobs, verbose=10)(
         delayed(_fit_and_score)(params, model, X_train, y_train, X_val, y_val, scoring)
         for params in grid
