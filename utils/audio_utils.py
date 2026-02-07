@@ -7,7 +7,7 @@ from utils.utils import get_file_path
 from scipy.io.wavfile import read, write
 
 
- def get_wav_duration(filepath):
+def get_wav_duration(filepath):
     """
     This is a helper function that checks if a given file
     exists and is a .wav and if so returns the file duration.
@@ -18,7 +18,6 @@ from scipy.io.wavfile import read, write
     Returns:
     float - audio length duration (in seconds) of the input time series or spectrogram.
 
-    Raises:
     FileNotFoundError
     """
     if os.path.exists(filepath):
