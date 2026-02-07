@@ -574,6 +574,52 @@ def grid_search_joblib(
     verbose: int | None = 1,
     n_jobs: int = 1,
 ):
+    """Parallel grid search over hyperparameters using joblib.
+
+    Evaluates every combination in ``param_grid`` on a held-out validation
+    set, selects the best configuration according to ``scoring``, retrains on
+    the combined train + validation data, and reports final metrics on the
+    test set.
+
+    Parameters
+    ----------
+    model : sklearn estimator
+        An unfitted scikit-learn estimator (e.g. ``LogisticRegression()``).
+        Must support ``clone``, ``set_params``, ``fit``, and ``predict``.
+    param_grid : dict
+        Dictionary mapping parameter names to lists of values to try,
+        compatible with ``sklearn.model_selection.ParameterGrid``.
+    train_path : str
+        Path to the training CSV file with extracted audio features.
+    val_path : str
+        Path to the validation CSV file with extracted audio features.
+    test_path : str
+        Path to the test CSV file with extracted audio features.
+    scoring : str, default ``"f1_macro"``
+        Metric used to select the best parameter set on the validation split.
+        Supported values: ``"f1_macro"`` and ``"accuracy"``.
+    verbose : int or None, default ``1``
+        Verbosity level. Set to ``0`` or ``None`` to silence progress output.
+    n_jobs : int, default ``1``
+        Number of parallel jobs passed to ``joblib.Parallel``.
+
+    Returns
+    -------
+    final_model : sklearn estimator
+        The best model retrained on train + validation data.
+    test_metrics : dict
+        Test-set metrics (accuracy, precision, recall, f1, roc_auc).
+    val_metrics : dict
+        Validation-set metrics for the best hyperparameter configuration.
+    best_params : dict
+        The hyperparameter combination that achieved the highest validation score.
+    val_results : list[dict]
+        Per-combination validation results from every grid point.
+    metadata : dict
+        Additional information (best validation score, split sizes).
+    feature_names : list[str]
+        Feature names used during training.
+    """
     # Load and prepare data
     X_train, y_train, X_val, y_val, X_test, y_test, feature_names = load_and_prepare_data(
         train_path, val_path, test_path
