@@ -20,7 +20,6 @@ PROMPTS.md
 *.pkl
 FoR_dataset/
 configs/config_local.py
-notebooks/experiments
 *.log
 FoR_dataset
 .idea/audio-deepfake-detection.iml
