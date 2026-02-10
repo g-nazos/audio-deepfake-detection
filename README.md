@@ -11,10 +11,12 @@
    ```
 
 3. Download the datasets zip and extract it into the project root (see [Data Setup](#data-setup) below)
-4. Start the environment:
+4. Build and start the environment (using the respective command for the docker version):
 
    ```bash
    docker compose up --build
+   # or
+   docker-compose up --build
    ```
 
 5. Open http://localhost:8888 in your browser
@@ -60,6 +62,12 @@ audio-deepfake-detection/
 ```
 
 The ML notebooks (in `notebooks/`) only require the `.parquet` feature files. The raw `.wav` audio files are only needed for feature extraction and audio exploration.
+
+**Note**: The Docker image does not include PyTorch, HuggingFace Transformers, or Gradio to keep it lightweight. The following notebooks wont run because of this:
+
+- `notebooks/gender_recognition.ipynb` (requires torch, transformers, gradio)
+- `notebooks/itw_data_exploration.ipynb` (requires torch, transformers, gradio)
+
 
 ## Manual Setup (without Docker)
 
