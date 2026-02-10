@@ -30,3 +30,12 @@ elevenlabs-dataset/
 .idea/inspectionProfiles/profiles_settings.xml
 elevenlabs-dataset
 elevenlabs-dataset.zip
+presentation/presentation.aux
+presentation/presentation.fdb_latexmk
+presentation/presentation.fls
+presentation/presentation.nav
+presentation/presentation.out
+presentation/presentation.snm
+presentation/presentation.synctex.gz
+presentation/presentation.toc
+presentation/presentation.xdv
