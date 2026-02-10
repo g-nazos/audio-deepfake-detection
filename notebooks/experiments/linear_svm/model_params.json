@@ -1,0 +1,9 @@
+{
+    "C": 1.0,
+    "class_weight": {
+        "0": 1,
+        "1": 5
+    },
+    "max_iter": 20000,
+    "random_state": 42
+}

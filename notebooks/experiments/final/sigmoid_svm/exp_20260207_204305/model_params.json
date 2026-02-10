@@ -1,0 +1,6 @@
+{
+    "svm__C": 0.1,
+    "svm__coef0": -1.0,
+    "svm__gamma": "scale",
+    "svm__kernel": "sigmoid"
+}

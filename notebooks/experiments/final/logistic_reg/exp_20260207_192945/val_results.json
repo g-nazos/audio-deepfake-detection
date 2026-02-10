@@ -1,0 +1,362 @@
+[
+    {
+        "params": {
+            "clf__C": 0.001,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.5645230902028485,
+        "val_f1_macro": 0.4522481729523853,
+        "val_precision": [
+            0.7462771731801385
+        ],
+        "val_recall": [
+            0.5544570306093543
+        ],
+        "val_roc_auc": 0.8796542097180601,
+        "selection_score": 0.4522481729523853
+    },
+    {
+        "params": {
+            "clf__C": 0.001,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.6348726801899007,
+        "val_f1_macro": 0.5752644870657293,
+        "val_precision": [
+            0.7679270504731861
+        ],
+        "val_recall": [
+            0.6266312937036871
+        ],
+        "val_roc_auc": 0.8993434196597637,
+        "selection_score": 0.5752644870657293
+    },
+    {
+        "params": {
+            "clf__C": 0.003593813663804626,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.639835994820889,
+        "val_f1_macro": 0.5843579222308262,
+        "val_precision": [
+            0.7640079525504789
+        ],
+        "val_recall": [
+            0.6318095749280612
+        ],
+        "val_roc_auc": 0.8941636474780457,
+        "selection_score": 0.5843579222308262
+    },
+    {
+        "params": {
+            "clf__C": 0.003593813663804626,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.6799741044454035,
+        "val_f1_macro": 0.6432384368887015,
+        "val_precision": [
+            0.780238746451305
+        ],
+        "val_recall": [
+            0.6729860893679832
+        ],
+        "val_roc_auc": 0.9092329397205946,
+        "selection_score": 0.6432384368887015
+    },
+    {
+        "params": {
+            "clf__C": 0.01291549665014884,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.6899007337073803,
+        "val_f1_macro": 0.6589007458990459,
+        "val_precision": [
+            0.7761992536536191
+        ],
+        "val_recall": [
+            0.6833624070015357
+        ],
+        "val_roc_auc": 0.9009491807189396,
+        "selection_score": 0.6589007458990459
+    },
+    {
+        "params": {
+            "clf__C": 0.01291549665014884,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7095381959430298,
+        "val_f1_macro": 0.6848089296600481,
+        "val_precision": [
+            0.7859555569988351
+        ],
+        "val_recall": [
+            0.7034990905160203
+        ],
+        "val_roc_auc": 0.909838641141477,
+        "selection_score": 0.6848089296600481
+    },
+    {
+        "params": {
+            "clf__C": 0.046415888336127795,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7166594734570565,
+        "val_f1_macro": 0.6952968804202755,
+        "val_precision": [
+            0.7836998927124943
+        ],
+        "val_recall": [
+            0.7109747506373842
+        ],
+        "val_roc_auc": 0.9015442590687479,
+        "selection_score": 0.6952968804202755
+    },
+    {
+        "params": {
+            "clf__C": 0.046415888336127795,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7220543806646526,
+        "val_f1_macro": 0.7019331473596633,
+        "val_precision": [
+            0.7872612822749925
+        ],
+        "val_recall": [
+            0.7164860744584097
+        ],
+        "val_roc_auc": 0.9056058132426832,
+        "selection_score": 0.7019331473596633
+    },
+    {
+        "params": {
+            "clf__C": 0.1668100537200059,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7242123435476909,
+        "val_f1_macro": 0.7052283163887476,
+        "val_precision": [
+            0.7858093763390597
+        ],
+        "val_recall": [
+            0.7187834533553995
+        ],
+        "val_roc_auc": 0.9018914657601647,
+        "selection_score": 0.7052283163887476
+    },
+    {
+        "params": {
+            "clf__C": 0.1668100537200059,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7259387138541217,
+        "val_f1_macro": 0.7073466717507721,
+        "val_precision": [
+            0.7868669738470071
+        ],
+        "val_recall": [
+            0.7205502378076963
+        ],
+        "val_roc_auc": 0.90325382803298,
+        "selection_score": 0.7073466717507721
+    },
+    {
+        "params": {
+            "clf__C": 0.5994842503189409,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7272334915839448,
+        "val_f1_macro": 0.7089987875810623,
+        "val_precision": [
+            0.7873650749208311
+        ],
+        "val_recall": [
+            0.7218852037393211
+        ],
+        "val_roc_auc": 0.9020605030490076,
+        "selection_score": 0.7089987875810623
+    },
+    {
+        "params": {
+            "clf__C": 0.5994842503189409,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7272334915839448,
+        "val_f1_macro": 0.7089987875810623,
+        "val_precision": [
+            0.7873650749208311
+        ],
+        "val_recall": [
+            0.7218852037393211
+        ],
+        "val_roc_auc": 0.9024388334749743,
+        "selection_score": 0.7089987875810623
+    },
+    {
+        "params": {
+            "clf__C": 2.1544346900318843,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9020925586318975,
+        "selection_score": 0.7096595016244469
+    },
+    {
+        "params": {
+            "clf__C": 2.1544346900318843,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7278808804488562,
+        "val_f1_macro": 0.7098563048701607,
+        "val_precision": [
+            0.7874695630927148
+        ],
+        "val_recall": [
+            0.7225576255013344
+        ],
+        "val_roc_auc": 0.902213885285742,
+        "selection_score": 0.7098563048701607
+    },
+    {
+        "params": {
+            "clf__C": 7.742636826811277,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9021123138167018,
+        "selection_score": 0.7096595016244469
+    },
+    {
+        "params": {
+            "clf__C": 7.742636826811277,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9021458603569352,
+        "selection_score": 0.7096595016244469
+    },
+    {
+        "params": {
+            "clf__C": 27.825594022071257,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9021141775133813,
+        "selection_score": 0.7096595016244469
+    },
+    {
+        "params": {
+            "clf__C": 27.825594022071257,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9021270370204708,
+        "selection_score": 0.7096595016244469
+    },
+    {
+        "params": {
+            "clf__C": 100.0,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l1",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9021152957313892,
+        "selection_score": 0.7096595016244469
+    },
+    {
+        "params": {
+            "clf__C": 100.0,
+            "clf__max_iter": 1000,
+            "clf__penalty": "l2",
+            "clf__solver": "saga"
+        },
+        "val_accuracy": 0.7276650841605524,
+        "val_f1_macro": 0.7096595016244469,
+        "val_precision": [
+            0.7870448342367036
+        ],
+        "val_recall": [
+            0.7223466550371994
+        ],
+        "val_roc_auc": 0.9021186503854124,
+        "selection_score": 0.7096595016244469
+    }
+]

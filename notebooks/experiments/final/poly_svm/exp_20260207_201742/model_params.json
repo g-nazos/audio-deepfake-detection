@@ -1,0 +1,7 @@
+{
+    "svm__C": 1,
+    "svm__coef0": 0.0,
+    "svm__degree": 2,
+    "svm__gamma": 0.01,
+    "svm__kernel": "poly"
+}
