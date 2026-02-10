@@ -76,24 +76,30 @@ pip install torch transformers gradio
 
 ## Manual Setup (without Docker)
 
-### macOS (Apple Silicon / Intel)
+1. Install Python 3.12+
+2. Create and activate a virtual environment:
 
-NVIDIA CUDA libraries are not available for macOS. Use the macOS-specific requirements file:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   # or
+   .venv\Scripts\activate
+   ```
 
-```bash
-pip install -r requirements-macos.txt
-```
+3. Install dependencies:
 
-### Linux / Windows
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-For systems with NVIDIA GPU support:
+4. For Python 3.13+, also install:
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install audioop-lts
+   ```
 
-For Windows with Python 3.13+, also install:
+5. For notebooks that use PyTorch (gender_recognition, itw_data_exploration):
 
-```bash
-pip install audioop-lts
-```
+   ```bash
+   pip install torch transformers gradio
+   ```
