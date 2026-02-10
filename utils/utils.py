@@ -387,6 +387,7 @@ def evaluate_model_on_parquet(
 
     # Load test dataset
     test_df = pd.read_parquet(test_path)
+    test_df.replace([np.inf, -np.inf], np.nan, inplace=True)
     test_df.dropna(inplace=True)
 
     # Split features and labels
@@ -403,8 +404,8 @@ def evaluate_model_on_parquet(
     # Metrics (explicitly fake=1)
     metrics = {
         "accuracy": float(accuracy_score(y_test, y_pred)),
-        "precision": float(precision_score(y_test, y_pred, pos_label=1)),
-        "recall": float(recall_score(y_test, y_pred, pos_label=1)),
+        "precision": float(precision_score(y_test, y_pred, average="macro")),
+        "recall": float(recall_score(y_test, y_pred, average="macro")),
         "f1_macro": float(f1_score(y_test, y_pred, average="macro")),
     }
 
@@ -455,6 +456,29 @@ def evaluate_model_on_parquet(
             plt.show()
 
     return metrics, metadata_extra
+
+
+def plot_roc_curve(model, X_test, y_test, label=None, ax=None):
+    """Plot ROC curve for a model. Handles both predict_proba and decision_function."""
+    from sklearn.metrics import roc_curve, auc
+
+    if hasattr(model, "predict_proba"):
+        y_scores = model.predict_proba(X_test)[:, 1]
+    else:
+        y_scores = model.decision_function(X_test)
+
+    fpr, tpr, _ = roc_curve(y_test, y_scores)
+    roc_auc = auc(fpr, tpr)
+
+    if ax is None:
+        ax = plt.gca()
+    ax.plot(fpr, tpr, label=f"{label} (AUC={roc_auc:.3f})" if label else f"AUC={roc_auc:.3f}")
+    ax.plot([0, 1], [0, 1], 'k--', alpha=0.3)
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve")
+    ax.legend()
+    return roc_auc
 
 
 def find_best_trained_monel(folder_path, metric):
@@ -931,16 +955,16 @@ def train_and_evaluate_xgboost(
     """
 
 
-    # default_params = {
-    #     "max_depth": 6,
-    #     "learning_rate": 0.1,
-    #     "subsample": 0.8,
-    #     "gamma": 0.0,
-    #     "colsample_bytree": 0.7,
-    #     "n_jobs": -1,
-    #     "verbosity": 2,
-    #     "eval_metric": "aucpr",
-    # }
+    default_params = {
+        "max_depth": 6,
+        "learning_rate": 0.1,
+        "subsample": 0.8,
+        "gamma": 0.0,
+        "colsample_bytree": 0.7,
+        "n_jobs": -1,
+        "verbosity": 2,
+        "eval_metric": "aucpr",
+    }
     
     default_params = {}
     default_params.update(xgb_params)
