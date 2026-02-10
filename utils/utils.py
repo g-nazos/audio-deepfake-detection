@@ -853,27 +853,17 @@ def train_and_evaluate_random_forest(
         ('rf', RandomForestClassifier(**default_params))
     ])
 
-    def load_data(path):
-        if path is None:
-            return None, None
-        df = pd.read_parquet(path)
-        X = df.drop(columns=["label", "filename"], errors="ignore")
-        y = df["label"].map({"real": 0, "fake": 1}).values # type: ignore
-        return X, y
+    # def load_data(path):
+    #     if path is None:
+    #         return None, None
+    #     df = pd.read_parquet(path)
+    #     X = df.drop(columns=["label", "filename"], errors="ignore")
+    #     y = df["label"].map({"real": 0, "fake": 1}).values # type: ignore
+    #     return X, y
 
-    X_train, y_train = load_data(train_path)
-    X_val, y_val = load_data(val_path)
-    X_test, y_test = load_data(test_path)
-
-    if X_test is None and X_val is None:
-        raise ValueError("At least one of val_path or test_path must be provided.")
-
-    feature_names = X_train.columns.tolist() # type: ignore
-    metadata_extra = {"train_samples": X_train.shape[0]} # type: ignore
-
-    print(f"Training on {X_train.shape[0]} samples with {len(feature_names)} features...") # type: ignore
+    X_train, y_train, X_val, y_val, X_test, y_test, feature_names = load_and_prepare_data(train_path, val_path, test_path)
+    metadata_extra = {"train_samples": X_train.shape[0]}
     pipeline.fit(X_train, y_train)
-
 
     def get_metrics(X, y, prefix=""):
         if X is None: 
