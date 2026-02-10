@@ -1,0 +1,4 @@
+notebooks/experiments/final/**/*.joblib filter=lfs diff=lfs merge=lfs -text
+notebooks/experiments/final/**/*.json filter=lfs diff=lfs merge=lfs -text
+notebooks/experiments/FoR/**/*.joblib filter=lfs diff=lfs merge=lfs -text
+notebooks/experiments/FoR/**/*.json filter=lfs diff=lfs merge=lfs -text
