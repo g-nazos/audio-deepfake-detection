@@ -11,8 +11,7 @@ RUN apt-get update && \
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir torch==2.9.1 --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir audioop-lts==0.2.2 && \
+RUN pip install --no-cache-dir audioop-lts==0.2.2 && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir jupyterlab
 
