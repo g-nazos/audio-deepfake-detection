@@ -65,9 +65,14 @@ The ML notebooks (in `notebooks/`) only require the `.parquet` feature files. Th
 
 **Note**: The Docker image does not include PyTorch, HuggingFace Transformers, or Gradio to keep it lightweight. The following notebooks wont run because of this:
 
-- `notebooks/gender_recognition.ipynb` (requires torch, transformers, gradio)
-- `notebooks/itw_data_exploration.ipynb` (requires torch, transformers, gradio)
+- `notebooks/gender_recognition.ipynb`
+- `notebooks/itw_data_exploration.ipynb`
 
+In case they are needed, they can be installed by running the following commands:
+
+```bash
+pip install torch transformers gradio
+```
 
 ## Manual Setup (without Docker)
 
