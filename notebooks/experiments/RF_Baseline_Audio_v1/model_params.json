@@ -1,9 +1,0 @@
-{
-    "n_estimators": 100,
-    "max_features": "sqrt",
-    "criterion": "gini",
-    "random_state": 42,
-    "bootstrap": true,
-    "oob_score": true,
-    "n_jobs": -1
-}

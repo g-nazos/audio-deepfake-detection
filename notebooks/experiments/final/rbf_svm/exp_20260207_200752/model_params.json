@@ -1,5 +1,0 @@
-{
-    "svm__C": 0.1,
-    "svm__gamma": 0.01,
-    "svm__kernel": "rbf"
-}

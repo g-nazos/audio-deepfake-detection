@@ -1,9 +1,0 @@
-{
-    "rf__class_weight": null,
-    "rf__max_depth": 4,
-    "rf__max_features": "sqrt",
-    "rf__max_samples": 0.6,
-    "rf__min_samples_leaf": 5,
-    "rf__min_samples_split": 20,
-    "rf__n_estimators": 500
-}

@@ -1,6 +1,0 @@
-{
-    "clf__C": 2.1544346900318843,
-    "clf__max_iter": 1000,
-    "clf__penalty": "l2",
-    "clf__solver": "saga"
-}
