@@ -1,6 +1,6 @@
 # audio-deepfake-detection
 
-## Quick Start (Docker) -- Recommended for evaluation
+## Quick Start (Docker) -- Recommended for evaluation using JupyterLab in Localhost
 
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 2. Clone this repository:
@@ -24,11 +24,12 @@ To stop the environment, press `Ctrl+C` in the terminal or run `docker compose d
 
 ## Data Setup
 
-The datasets are not included in the repository due to their size. Download and extract them into the project root so the folder structure matches:
+The datasets are not included in the repository due to their size. Download and extract them from [Google Drive](https://drive.google.com/file/d/1IRYglNlMVYHwYFksumPMJEnrOjJYWkIm/view?usp=sharing) into the project root so the folder structure matches:
 
 ```
 audio-deepfake-detection/
 ├── FoR_dataset/
+│   ...
 │   ├── for-norm/for-norm/
 │   │   ├── training/
 │   │   │   ├── real/*.wav
@@ -42,13 +43,16 @@ audio-deepfake-detection/
 │   └── features/
 │       └── *.parquet
 ├── in-the-wild-audio-deepfake/
-│   ├── release_in_the_wild/
+│   ...
+│
+│   ├── release_in_the_wild_trimmed_normalized/
 │   │   ├── real/*.wav
 │   │   └── fake/*.wav
-│   ├── features/
+│   ├── normalized_features/
 │   │   └── *.parquet
 │   └── meta.csv
 └── elevenlabs-dataset/
+    ├── ...   
     ├── fake/*.wav
     ├── real/*.wav
     └── features/
@@ -80,5 +84,3 @@ For Windows with Python 3.13+, also install:
 ```bash
 pip install audioop-lts
 ```
-
-**Note**: The macOS requirements file excludes CUDA dependencies (`nvidia-*` packages) and `triton`, which are only available on Linux/Windows systems with NVIDIA GPUs. PyTorch on macOS will use CPU or Metal (MPS) acceleration instead.
