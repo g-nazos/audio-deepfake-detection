@@ -11,3 +11,4 @@ ELEVEN_LABS_FEATURES_PATH = os.path.join(PROJECT_ROOT, "elevenlabs-dataset", "fe
 ELEVEN_LABS_DATASET_PATH = os.path.join(PROJECT_ROOT, "elevenlabs-dataset")
 MODELS_PATH = os.path.join(PROJECT_ROOT, "notebooks", "experiments")
 FINAL_MODELS_PATH = os.path.join(PROJECT_ROOT, "notebooks", "experiments", "final")
+FOR_MODELS_PATH = os.path.join(PROJECT_ROOT, "notebooks", "experiments", "FoR")
